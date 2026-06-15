@@ -14,7 +14,7 @@ services:
       - key: CAREWISE_REDIS_URL
         fromService:
           name: carewise-redis
-          type: redis
+          type: keyvalue
           property: connectionString
       - key: CAREWISE_JWT_SECRET
         sync: false
@@ -40,7 +40,7 @@ services:
       - key: CAREWISE_REDIS_URL
         fromService:
           name: carewise-redis
-          type: redis
+          type: keyvalue
           property: connectionString
       - key: CAREWISE_JWT_SECRET
         sync: false
@@ -51,10 +51,15 @@ services:
       - key: CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT
         value: ""
 
+  - type: keyvalue
+    name: carewise-redis
+    plan: free
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: everywhere
+    maxmemoryPolicy: noeviction
+    persistenceMode: off
+
 databases:
   - name: carewise-postgres
-    plan: starter
-
-redis:
-  - name: carewise-redis
-    plan: starter
+    plan: free

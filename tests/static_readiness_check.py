@@ -45,14 +45,14 @@ REQUIRED_FILES = [
 
 REQUIRED_STRINGS = {
     "Dockerfile": ["python -m app.db.migrate", "uvicorn", "PORT"],
-    "app/core/config.py": ["validate_for_startup", "Production configuration is not ready"],
+    "app/core/config.py": ["validate_for_startup", "Production configuration is not ready", "sqlalchemy_database_url"],
     "app/core/security.py": ["create_access_token", "get_current_user", "verify_password"],
     "app/core/rbac.py": ["Role", "require_roles"],
     "app/core/crypto.py": ["encrypt_field", "decrypt_field", "Fernet"],
     "app/main.py": ["settings.validate_for_startup()", "init_local_database"],
     "app/models/carewise.py": ["PatientProfile", "CarePlan", "AuditEvent", "ConsentRecord", "location_region", "Index"],
-    "migrations/env.py": ["settings.database_url", "config.set_main_option"],
-    "app/db/migrate.py": ["command.stamp", "command.upgrade", "alembic_version"],
+    "migrations/env.py": ["settings.sqlalchemy_database_url", "config.set_main_option"],
+    "app/db/migrate.py": ["command.stamp", "command.upgrade", "alembic_version", "settings.sqlalchemy_database_url"],
     "migrations/versions/0001_initial_schema.py": ["create_table", "users", "patient_profiles", "care_plans"],
     "app/api/routes/consent.py": ["record_consent", "consent_history", "consent_recorded"],
     "app/services/queue.py": ["Redis", "Queue", "enqueue_care_plan_generation"],

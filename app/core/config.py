@@ -29,6 +29,14 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.allowed_origins.split(",") if item.strip()]
 
     @property
+    def sqlalchemy_database_url(self) -> str:
+        if self.database_url.startswith("postgres://"):
+            return self.database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        if self.database_url.startswith("postgresql://"):
+            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return self.database_url
+
+    @property
     def is_production(self) -> bool:
         return self.env.lower() == "production"
 

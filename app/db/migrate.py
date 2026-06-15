@@ -11,12 +11,12 @@ def alembic_config() -> Config:
     root = Path(__file__).resolve().parents[2]
     config = Config(str(root / "alembic.ini"))
     config.set_main_option("script_location", str(root / "migrations"))
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+    config.set_main_option("sqlalchemy.url", settings.sqlalchemy_database_url)
     return config
 
 
 def migrate_database() -> None:
-    engine = create_engine(settings.database_url, pool_pre_ping=True)
+    engine = create_engine(settings.sqlalchemy_database_url, pool_pre_ping=True)
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
     has_existing_schema = "users" in table_names and "patient_profiles" in table_names

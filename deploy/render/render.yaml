@@ -2,7 +2,7 @@ services:
   - type: web
     name: carewise-api
     runtime: docker
-    plan: standard
+    plan: starter
     healthCheckPath: /health
     envVars:
       - key: CAREWISE_ENV
@@ -28,7 +28,7 @@ services:
   - type: worker
     name: carewise-worker
     runtime: docker
-    plan: standard
+    plan: starter
     dockerCommand: python -m app.workers.worker
     envVars:
       - key: CAREWISE_ENV
@@ -53,8 +53,8 @@ services:
 
 databases:
   - name: carewise-postgres
-    plan: standard
+    plan: starter
 
 redis:
   - name: carewise-redis
-    plan: standard
+    plan: starter

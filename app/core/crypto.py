@@ -1,13 +1,18 @@
+import base64
+import hashlib
+
 from cryptography.fernet import Fernet, InvalidToken
 
 from app.core.config import settings
 
 
 def _fernet() -> Fernet:
+    raw_key = settings.clean_field_encryption_key
     try:
-        return Fernet(settings.clean_field_encryption_key.encode("utf-8"))
-    except ValueError as exc:
-        raise RuntimeError("CAREWISE_FIELD_ENCRYPTION_KEY must be a valid Fernet key.") from exc
+        return Fernet(raw_key.encode("utf-8"))
+    except ValueError:
+        derived_key = base64.urlsafe_b64encode(hashlib.sha256(raw_key.encode("utf-8")).digest())
+        return Fernet(derived_key)
 
 
 def encrypt_field(value: str | None) -> str:

@@ -48,7 +48,7 @@ REQUIRED_STRINGS = {
     "app/core/config.py": ["validate_for_startup", "Production configuration is not ready", "sqlalchemy_database_url", "clean_env_value"],
     "app/core/security.py": ["create_access_token", "get_current_user", "verify_password", "clean_jwt_secret"],
     "app/core/rbac.py": ["Role", "require_roles"],
-    "app/core/crypto.py": ["encrypt_field", "decrypt_field", "Fernet"],
+    "app/core/crypto.py": ["encrypt_field", "decrypt_field", "Fernet", "hashlib.sha256"],
     "app/main.py": ["settings.validate_for_startup()", "init_local_database"],
     "app/models/carewise.py": ["PatientProfile", "CarePlan", "AuditEvent", "ConsentRecord", "location_region", "Index"],
     "migrations/env.py": ["settings.sqlalchemy_database_url", "config.set_main_option"],

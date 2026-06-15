@@ -2,14 +2,16 @@
 
 ## Best First Upload Choice
 
-Use Render first. It is the simplest path for a beginner because it can run:
+Use Render first. It is the simplest path for a beginner.
+
+For the first free prototype deploy, run:
 
 - One Docker web service for the API.
-- One Docker worker service.
 - Managed PostgreSQL.
-- Managed Redis.
 - HTTPS automatically.
 - Environment variables from a dashboard.
+
+Add Redis and the background worker later when you are ready to pay for always-on background work.
 
 Fly.io, AWS, and GCP files are included, but Render is the recommended first official upload.
 
@@ -32,7 +34,6 @@ Never commit real production secrets into GitHub.
 
 - `CAREWISE_ENV=production`
 - `CAREWISE_DATABASE_URL`
-- `CAREWISE_REDIS_URL`
 - `CAREWISE_JWT_SECRET`
 - `CAREWISE_FIELD_ENCRYPTION_KEY`
 - `CAREWISE_ALLOWED_ORIGINS`
@@ -54,13 +55,12 @@ http://localhost:4173,http://localhost:3000
 
 1. Push this backend folder to GitHub.
 2. In Render, create a Blueprint from `deploy/render/render.yaml`, or create services manually.
-3. Create managed PostgreSQL and Redis.
+3. Create managed PostgreSQL.
 4. Set `CAREWISE_JWT_SECRET` and `CAREWISE_FIELD_ENCRYPTION_KEY` from `scripts/generate_secrets.py`.
 5. Set `CAREWISE_ALLOWED_ORIGINS` to the deployed frontend URL.
 6. Deploy the API service.
-7. Deploy the worker service.
-8. Open `/health` on the API URL.
-9. Run:
+7. Open `/health` on the API URL.
+8. Run:
 
 ```bash
 python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL

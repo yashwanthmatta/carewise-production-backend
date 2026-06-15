@@ -58,7 +58,7 @@ REQUIRED_STRINGS = {
     "app/services/queue.py": ["Redis", "Queue", "enqueue_care_plan_generation"],
     "app/services/telemetry.py": ["OpenTelemetry", "FastAPIInstrumentor"],
     "docker-compose.yml": ["postgres", "redis", "worker"],
-    "deploy/render/render.yaml": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY", "CAREWISE_ALLOWED_ORIGINS", "keyvalue"],
+    "deploy/render/render.yaml": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY", "CAREWISE_ALLOWED_ORIGINS", "plan: free"],
     "deploy/fly/fly.toml": ["CAREWISE_ALLOWED_ORIGINS", "force_https"],
     "deploy/aws/ecs-task-definition.json": ["CAREWISE_ALLOWED_ORIGINS", "CAREWISE_FIELD_ENCRYPTION_KEY"],
     "deploy/gcp/cloud-run-service.yaml": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY"],

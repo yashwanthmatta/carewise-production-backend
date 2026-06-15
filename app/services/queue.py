@@ -5,6 +5,8 @@ from app.core.config import settings
 
 
 def get_queue() -> Queue:
+    if not settings.redis_url:
+        raise RuntimeError("CAREWISE_REDIS_URL is required for async care-plan jobs.")
     return Queue("carewise-default", connection=Redis.from_url(settings.redis_url))
 
 

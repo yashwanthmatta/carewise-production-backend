@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     env: str = "local"
     service_name: str = "carewise-api"
     database_url: str = "postgresql+psycopg://carewise:carewise@localhost:5432/carewise"
-    redis_url: str = "redis://localhost:6379/0"
+    redis_url: str = ""
     jwt_secret: str = "replace-me"
     field_encryption_key: str = "replace-with-fernet-key"
     access_token_minutes: int = 30
@@ -40,7 +40,7 @@ class Settings(BaseSettings):
             return
 
         missing = []
-        for field_name in ("database_url", "redis_url", "jwt_secret", "field_encryption_key"):
+        for field_name in ("database_url", "jwt_secret", "field_encryption_key"):
             if getattr(self, field_name) in PLACEHOLDER_VALUES:
                 missing.append(f"CAREWISE_{field_name.upper()}")
 

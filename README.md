@@ -102,11 +102,11 @@ deploy/render/render.yaml
 Required cloud services:
 
 - Web service for API
-- Worker service
 - Managed PostgreSQL
-- Managed Redis
 - Secret manager or dashboard environment variables
 - HTTPS
+
+Redis and the worker are included for later scale work, but the first Render Blueprint deploys only the API and Postgres to avoid paid background services.
 
 The container automatically runs:
 

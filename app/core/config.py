@@ -24,17 +24,36 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:4173,http://localhost:3000"
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
 
+    @staticmethod
+    def clean_env_value(value: str) -> str:
+        if "=" in value:
+            value = value.split("=", 1)[1]
+        return value.strip().strip('"').strip("'")
+
     @property
     def allowed_origin_list(self) -> list[str]:
         return [item.strip() for item in self.allowed_origins.split(",") if item.strip()]
 
     @property
     def sqlalchemy_database_url(self) -> str:
-        if self.database_url.startswith("postgres://"):
-            return self.database_url.replace("postgres://", "postgresql+psycopg://", 1)
-        if self.database_url.startswith("postgresql://"):
-            return self.database_url.replace("postgresql://", "postgresql+psycopg://", 1)
-        return self.database_url
+        database_url = self.clean_env_value(self.database_url)
+        if database_url.startswith("postgres://"):
+            return database_url.replace("postgres://", "postgresql+psycopg://", 1)
+        if database_url.startswith("postgresql://"):
+            return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
+        return database_url
+
+    @property
+    def clean_jwt_secret(self) -> str:
+        return self.clean_env_value(self.jwt_secret)
+
+    @property
+    def clean_field_encryption_key(self) -> str:
+        return self.clean_env_value(self.field_encryption_key)
+
+    @property
+    def clean_otel_exporter_otlp_endpoint(self) -> str:
+        return self.clean_env_value(self.otel_exporter_otlp_endpoint)
 
     @property
     def is_production(self) -> bool:
@@ -49,10 +68,10 @@ class Settings(BaseSettings):
 
         missing = []
         for field_name in ("database_url", "jwt_secret", "field_encryption_key"):
-            if getattr(self, field_name) in PLACEHOLDER_VALUES:
+            if self.clean_env_value(getattr(self, field_name)) in PLACEHOLDER_VALUES:
                 missing.append(f"CAREWISE_{field_name.upper()}")
 
-        if "localhost" in self.database_url or "@localhost" in self.database_url:
+        if "localhost" in self.sqlalchemy_database_url or "@localhost" in self.sqlalchemy_database_url:
             missing.append("CAREWISE_DATABASE_URL production host")
 
         if missing:

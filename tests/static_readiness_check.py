@@ -45,8 +45,8 @@ REQUIRED_FILES = [
 
 REQUIRED_STRINGS = {
     "Dockerfile": ["python -m app.db.migrate", "uvicorn", "PORT"],
-    "app/core/config.py": ["validate_for_startup", "Production configuration is not ready", "sqlalchemy_database_url"],
-    "app/core/security.py": ["create_access_token", "get_current_user", "verify_password"],
+    "app/core/config.py": ["validate_for_startup", "Production configuration is not ready", "sqlalchemy_database_url", "clean_env_value"],
+    "app/core/security.py": ["create_access_token", "get_current_user", "verify_password", "clean_jwt_secret"],
     "app/core/rbac.py": ["Role", "require_roles"],
     "app/core/crypto.py": ["encrypt_field", "decrypt_field", "Fernet"],
     "app/main.py": ["settings.validate_for_startup()", "init_local_database"],
@@ -56,7 +56,7 @@ REQUIRED_STRINGS = {
     "migrations/versions/0001_initial_schema.py": ["create_table", "users", "patient_profiles", "care_plans"],
     "app/api/routes/consent.py": ["record_consent", "consent_history", "consent_recorded"],
     "app/services/queue.py": ["Redis", "Queue", "enqueue_care_plan_generation"],
-    "app/services/telemetry.py": ["OpenTelemetry", "FastAPIInstrumentor"],
+    "app/services/telemetry.py": ["OpenTelemetry", "FastAPIInstrumentor", "clean_otel_exporter_otlp_endpoint"],
     "docker-compose.yml": ["postgres", "redis", "worker"],
     "deploy/render/render.yaml": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY", "CAREWISE_ALLOWED_ORIGINS", "plan: free"],
     "deploy/fly/fly.toml": ["CAREWISE_ALLOWED_ORIGINS", "force_https"],

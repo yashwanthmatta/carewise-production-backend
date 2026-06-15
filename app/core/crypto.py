@@ -5,7 +5,7 @@ from app.core.config import settings
 
 def _fernet() -> Fernet:
     try:
-        return Fernet(settings.field_encryption_key.encode("utf-8"))
+        return Fernet(settings.clean_field_encryption_key.encode("utf-8"))
     except ValueError as exc:
         raise RuntimeError("CAREWISE_FIELD_ENCRYPTION_KEY must be a valid Fernet key.") from exc
 

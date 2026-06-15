@@ -1,0 +1,60 @@
+services:
+  - type: web
+    name: carewise-api
+    runtime: docker
+    plan: standard
+    healthCheckPath: /health
+    envVars:
+      - key: CAREWISE_ENV
+        value: production
+      - key: CAREWISE_DATABASE_URL
+        fromDatabase:
+          name: carewise-postgres
+          property: connectionString
+      - key: CAREWISE_REDIS_URL
+        fromService:
+          name: carewise-redis
+          type: redis
+          property: connectionString
+      - key: CAREWISE_JWT_SECRET
+        sync: false
+      - key: CAREWISE_FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: CAREWISE_ALLOWED_ORIGINS
+        sync: false
+      - key: CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT
+        value: ""
+
+  - type: worker
+    name: carewise-worker
+    runtime: docker
+    plan: standard
+    dockerCommand: python -m app.workers.worker
+    envVars:
+      - key: CAREWISE_ENV
+        value: production
+      - key: CAREWISE_DATABASE_URL
+        fromDatabase:
+          name: carewise-postgres
+          property: connectionString
+      - key: CAREWISE_REDIS_URL
+        fromService:
+          name: carewise-redis
+          type: redis
+          property: connectionString
+      - key: CAREWISE_JWT_SECRET
+        sync: false
+      - key: CAREWISE_FIELD_ENCRYPTION_KEY
+        sync: false
+      - key: CAREWISE_ALLOWED_ORIGINS
+        sync: false
+      - key: CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT
+        value: ""
+
+databases:
+  - name: carewise-postgres
+    plan: standard
+
+redis:
+  - name: carewise-redis
+    plan: standard

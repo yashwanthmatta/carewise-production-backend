@@ -1,0 +1,46 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: carewise-api
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "2"
+        autoscaling.knative.dev/maxScale: "100"
+    spec:
+      containers:
+        - image: gcr.io/PROJECT_ID/carewise-api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: CAREWISE_ENV
+              value: production
+            - name: CAREWISE_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: carewise-database-url
+                  key: latest
+            - name: CAREWISE_REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: carewise-redis-url
+                  key: latest
+            - name: CAREWISE_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: carewise-jwt-secret
+                  key: latest
+            - name: CAREWISE_FIELD_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: carewise-field-encryption-key
+                  key: latest
+            - name: CAREWISE_ALLOWED_ORIGINS
+              value: https://your-frontend-domain.com
+            - name: CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT
+              value: ""
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000

@@ -1,0 +1,114 @@
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base
+
+
+def new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid.uuid4().hex}"
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("user"))
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(40), index=True, default="patient")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    patient_profile: Mapped["PatientProfile"] = relationship(back_populates="user")
+
+
+class PatientProfile(Base):
+    __tablename__ = "patient_profiles"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("patient"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    encrypted_name: Mapped[str] = mapped_column(Text, default="")
+    encrypted_date_of_birth: Mapped[str] = mapped_column(Text, default="")
+    sex_at_birth: Mapped[str] = mapped_column(String(40), default="")
+    encrypted_conditions: Mapped[str] = mapped_column(Text, default="")
+    encrypted_allergies: Mapped[str] = mapped_column(Text, default="")
+    location_region: Mapped[str] = mapped_column(String(120), index=True, default="")
+    insurance_status: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="patient_profile")
+
+
+class ConsentRecord(Base):
+    __tablename__ = "consent_records"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("consent"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    consent_type: Mapped[str] = mapped_column(String(120), index=True)
+    version: Mapped[str] = mapped_column(String(80), index=True)
+    accepted: Mapped[str] = mapped_column(String(10), default="true")
+    region: Mapped[str] = mapped_column(String(120), index=True, default="")
+    source: Mapped[str] = mapped_column(String(120), default="web")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Medication(Base):
+    __tablename__ = "medications"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("med"))
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    encrypted_name: Mapped[str] = mapped_column(Text)
+    encrypted_dose: Mapped[str] = mapped_column(Text, default="")
+    encrypted_timing: Mapped[str] = mapped_column(Text, default="")
+    refill_date: Mapped[str] = mapped_column(String(40), default="")
+    encrypted_notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Intake(Base):
+    __tablename__ = "intakes"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("intake"))
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    encrypted_symptom_text: Mapped[str] = mapped_column(Text)
+    goals_json: Mapped[str] = mapped_column(Text, default="[]")
+    diet_style: Mapped[str] = mapped_column(String(80), default="")
+    activity_level: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CarePlan(Base):
+    __tablename__ = "care_plans"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("plan"))
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    intake_id: Mapped[str] = mapped_column(ForeignKey("intakes.id"), index=True)
+    risk_level: Mapped[str] = mapped_column(String(80), index=True)
+    status: Mapped[str] = mapped_column(String(80), index=True, default="pending_review")
+    emergency_flags_json: Mapped[str] = mapped_column(Text, default="[]")
+    matched_conditions_json: Mapped[str] = mapped_column(Text, default="[]")
+    recommendation_json: Mapped[str] = mapped_column(Text, default="{}")
+    clinician_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("audit"))
+    actor_id: Mapped[str] = mapped_column(String(80), index=True, default="")
+    patient_id: Mapped[str] = mapped_column(String(80), index=True, default="")
+    action: Mapped[str] = mapped_column(String(120), index=True)
+    resource_type: Mapped[str] = mapped_column(String(80), default="")
+    resource_id: Mapped[str] = mapped_column(String(80), default="")
+    metadata_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+Index("idx_care_plans_patient_created", CarePlan.patient_id, CarePlan.created_at.desc())
+Index("idx_care_plans_status_created", CarePlan.status, CarePlan.created_at.desc())
+Index("idx_audit_patient_created", AuditEvent.patient_id, AuditEvent.created_at.desc())
+Index("idx_consent_user_created", ConsentRecord.user_id, ConsentRecord.created_at.desc())
+Index("idx_consent_region_created", ConsentRecord.region, ConsentRecord.created_at.desc())

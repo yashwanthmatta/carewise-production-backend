@@ -1,0 +1,23 @@
+app = "carewise-api"
+primary_region = "sjc"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  CAREWISE_ENV = "production"
+  CAREWISE_ALLOWED_ORIGINS = "https://your-frontend-domain.com"
+  CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT = ""
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 2
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "2s"
+    method = "GET"
+    path = "/health"

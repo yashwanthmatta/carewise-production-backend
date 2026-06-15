@@ -1,0 +1,40 @@
+{
+  "family": "carewise-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::<account-id>:role/ecsTaskExecutionRole",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "<account-id>.dkr.ecr.<region>.amazonaws.com/carewise-api:latest",
+      "portMappings": [{ "containerPort": 8000, "protocol": "tcp" }],
+      "environment": [
+        { "name": "CAREWISE_ENV", "value": "production" },
+        { "name": "CAREWISE_ALLOWED_ORIGINS", "value": "https://your-frontend-domain.com" },
+        { "name": "CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT", "value": "" }
+      ],
+      "healthCheck": {
+        "command": ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3
+      },
+      "secrets": [
+        { "name": "CAREWISE_DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:carewise/database-url" },
+        { "name": "CAREWISE_REDIS_URL", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:carewise/redis-url" },
+        { "name": "CAREWISE_JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:carewise/jwt-secret" },
+        { "name": "CAREWISE_FIELD_ENCRYPTION_KEY", "valueFrom": "arn:aws:secretsmanager:<region>:<account-id>:secret:carewise/field-key" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/carewise-api",
+          "awslogs-region": "<region>",
+          "awslogs-stream-prefix": "api"
+        }
+      }
+    }
+  ]
+}

@@ -45,7 +45,7 @@ REQUIRED_FILES = [
 
 REQUIRED_STRINGS = {
     "Dockerfile": ["python -m app.db.migrate", "uvicorn", "PORT"],
-    "app/core/config.py": ["validate_for_startup", "Production configuration is not ready", "sqlalchemy_database_url", "clean_env_value"],
+    "app/core/config.py": ["validate_for_startup", "Production configuration is not ready", "sqlalchemy_database_url", "clean_env_value", "carewise-frontend.onrender.com"],
     "app/core/security.py": ["create_access_token", "get_current_user", "verify_password", "clean_jwt_secret"],
     "app/core/rbac.py": ["Role", "require_roles"],
     "app/core/crypto.py": ["encrypt_field", "decrypt_field", "Fernet", "hashlib.sha256"],

@@ -10,6 +10,12 @@ PLACEHOLDER_VALUES = {
     "replace-with-fernet-key",
 }
 
+DEFAULT_ALLOWED_ORIGINS = {
+    "http://localhost:4173",
+    "http://localhost:3000",
+    "https://carewise-frontend.onrender.com",
+}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CAREWISE_", env_file=".env")
@@ -32,7 +38,8 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origin_list(self) -> list[str]:
-        return [item.strip() for item in self.allowed_origins.split(",") if item.strip()]
+        configured = {item.strip() for item in self.allowed_origins.split(",") if item.strip()}
+        return sorted(configured | DEFAULT_ALLOWED_ORIGINS)
 
     @property
     def sqlalchemy_database_url(self) -> str:

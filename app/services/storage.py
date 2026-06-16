@@ -1,5 +1,9 @@
+import base64
+import json
 import re
 import tempfile
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from shutil import copyfileobj
@@ -10,6 +14,9 @@ from app.core.config import settings
 
 
 SAFE_NAME_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
+IMAGE_CONTENT_TYPES = {"image/png", "image/jpeg", "image/webp"}
+PDF_CONTENT_TYPES = {"application/pdf"}
+MAX_OCR_BYTES = 8 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -85,9 +92,19 @@ def persist_temp_file_locally(temp_path: Path, storage_key: str) -> str:
 
 
 def extract_text_from_temp_file(temp_path: Path, content_type: str, file_name: str) -> str:
-    if content_type != "text/plain" and not file_name.lower().endswith(".txt"):
-        return ""
+    if content_type == "text/plain" or file_name.lower().endswith(".txt"):
+        return decode_text_file(temp_path)
 
+    if content_type in PDF_CONTENT_TYPES or file_name.lower().endswith(".pdf"):
+        return extract_text_from_pdf(temp_path)
+
+    if content_type in IMAGE_CONTENT_TYPES:
+        return extract_text_with_openai_vision(temp_path, content_type)
+
+    return ""
+
+
+def decode_text_file(temp_path: Path) -> str:
     raw = temp_path.read_bytes()[:120_000]
     for encoding in ("utf-8", "utf-16", "latin-1"):
         try:
@@ -95,6 +112,81 @@ def extract_text_from_temp_file(temp_path: Path, content_type: str, file_name: s
         except UnicodeDecodeError:
             continue
     return ""
+
+
+def extract_text_from_pdf(temp_path: Path) -> str:
+    try:
+        from pypdf import PdfReader
+    except ImportError:
+        return ""
+
+    try:
+        reader = PdfReader(str(temp_path))
+        pages = []
+        for page in reader.pages[:8]:
+            pages.append(page.extract_text() or "")
+        return "\n\n".join(pages).strip()[:12000]
+    except Exception:
+        return ""
+
+
+def extract_text_with_openai_vision(temp_path: Path, content_type: str) -> str:
+    api_key = settings.clean_env_value(settings.openai_api_key)
+    if not api_key:
+        return ""
+
+    image_bytes = temp_path.read_bytes()
+    if len(image_bytes) > MAX_OCR_BYTES:
+        return ""
+
+    data_url = f"data:{content_type};base64,{base64.b64encode(image_bytes).decode('ascii')}"
+    payload = {
+        "model": settings.openai_ocr_model,
+        "input": [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": (
+                            "Extract readable text and lab values from this healthcare report image. "
+                            "Return plain text only. Do not diagnose, infer conditions, or add advice."
+                        ),
+                    },
+                    {"type": "input_image", "image_url": data_url, "detail": "high"},
+                ],
+            }
+        ],
+        "max_output_tokens": 1600,
+    }
+    request = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except (TimeoutError, urllib.error.URLError, urllib.error.HTTPError, json.JSONDecodeError):
+        return ""
+
+    return response_text(result).strip()[:12000]
+
+
+def response_text(result: dict) -> str:
+    if isinstance(result.get("output_text"), str):
+        return result["output_text"]
+
+    chunks = []
+    for output in result.get("output", []):
+        for content in output.get("content", []):
+            if isinstance(content.get("text"), str):
+                chunks.append(content["text"])
+    return "\n".join(chunks)
 
 
 def upload_temp_file_to_s3(temp_path: Path, storage_key: str, content_type: str) -> str:

@@ -3,6 +3,7 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.services import storage
 
 
 def auth_headers(client: TestClient, role: str = "patient") -> tuple[dict[str, str], str]:
@@ -109,6 +110,53 @@ def test_unreadable_file_upload_requests_ocr_text_before_analysis():
         assert analysis_payload["risk_level"] == "needs_text"
         assert analysis_payload["status"] == "needs_readable_text"
         assert "no readable text" in analysis_payload["summary"]["message"]
+
+
+def test_image_upload_uses_ocr_text_for_analysis_when_extractor_is_available(monkeypatch):
+    monkeypatch.setattr(
+        storage,
+        "extract_text_with_openai_vision",
+        lambda temp_path, content_type: "LDL cholesterol elevated. A1C normal. No chest pain.",
+    )
+    app = create_app()
+    with TestClient(app) as client:
+        headers, _ = auth_headers(client)
+        patient_id = create_profile(client, headers)
+
+        upload = client.post(
+            "/reports/upload-file",
+            data={"patient_id": patient_id},
+            files={"file": ("report.png", b"fake-image-bytes", "image/png")},
+            headers=headers,
+        )
+        assert upload.status_code == 200
+
+        analysis = client.post(f"/reports/{upload.json()['id']}/analyze", headers=headers)
+        assert analysis.status_code == 200
+        analysis_payload = analysis.json()
+        assert analysis_payload["risk_level"] == "clinician_review"
+        assert "heart_support" in analysis_payload["summary"]["detected_terms"]
+
+
+def test_image_upload_without_ocr_key_requests_readable_text():
+    app = create_app()
+    with TestClient(app) as client:
+        headers, _ = auth_headers(client)
+        patient_id = create_profile(client, headers)
+
+        upload = client.post(
+            "/reports/upload-file",
+            data={"patient_id": patient_id},
+            files={"file": ("report.png", b"fake-image-bytes", "image/png")},
+            headers=headers,
+        )
+        assert upload.status_code == 200
+
+        analysis = client.post(f"/reports/{upload.json()['id']}/analyze", headers=headers)
+        assert analysis.status_code == 200
+        analysis_payload = analysis.json()
+        assert analysis_payload["risk_level"] == "needs_text"
+        assert analysis_payload["status"] == "needs_readable_text"
 
 
 def test_patient_cannot_access_another_patient_records():

@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,6 +35,14 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
     s3_endpoint_url: str = ""
+    openai_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("CAREWISE_OPENAI_API_KEY", "OPENAI_API_KEY"),
+    )
+    openai_ocr_model: str = Field(
+        default="gpt-5.5",
+        validation_alias=AliasChoices("CAREWISE_OPENAI_OCR_MODEL", "OPENAI_OCR_MODEL"),
+    )
     max_report_file_bytes: int = 10 * 1024 * 1024
     allowed_report_content_types: str = "text/plain,application/pdf,image/png,image/jpeg,image/webp,image/heic"
 

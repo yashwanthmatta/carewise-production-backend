@@ -140,6 +140,8 @@ The backend now supports:
 - File-size limits through `CAREWISE_MAX_REPORT_FILE_BYTES`
 - Local object-store style paths under `CAREWISE_LOCAL_STORAGE_DIR`
 - Optional S3-compatible storage through `CAREWISE_STORAGE_BACKEND=s3`
+- Automatic text extraction for `.txt` uploads and text-based PDFs
+- Optional OpenAI vision OCR for report images when `CAREWISE_OPENAI_API_KEY` is set
 - Encrypted report text stored in PostgreSQL
 - File metadata stored in PostgreSQL
 
@@ -158,6 +160,17 @@ CAREWISE_S3_ENDPOINT_URL= # optional, use for Cloudflare R2 or compatible provid
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 ```
+
+Optional OCR configuration:
+
+```text
+CAREWISE_OPENAI_API_KEY=...
+CAREWISE_OPENAI_OCR_MODEL=gpt-5.5
+```
+
+Without an OCR key, images and scanned PDFs are still stored privately, but
+analysis will ask the user to paste OCR text or key lab values before relying on
+report interpretation.
 
 Setup guides:
 

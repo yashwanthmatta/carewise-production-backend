@@ -99,6 +99,10 @@ class ReportAnalysisOut(BaseModel):
     recommendations: dict
 
 
+class AnalyzeReportRequest(BaseModel):
+    report_id: str
+
+
 class RecommendationRequest(BaseModel):
     patient_id: str
     context_text: str = ""

@@ -101,3 +101,24 @@ def upload_temp_file_to_s3(temp_path: Path, storage_key: str, content_type: str)
             ExtraArgs={"ContentType": content_type, "ServerSideEncryption": "AES256"},
         )
     return f"s3://{settings.s3_bucket}/{storage_key}"
+
+
+def delete_stored_file(storage_key: str) -> bool:
+    if not storage_key:
+        return False
+    if settings.storage_backend.lower() == "s3":
+        if not settings.s3_bucket:
+            return False
+        import boto3
+
+        client_kwargs = {"region_name": settings.s3_region}
+        if settings.s3_endpoint_url:
+            client_kwargs["endpoint_url"] = settings.s3_endpoint_url
+        client = boto3.client("s3", **client_kwargs)
+        client.delete_object(Bucket=settings.s3_bucket, Key=storage_key)
+        return True
+
+    target_path = storage_root() / storage_key
+    existed = target_path.exists()
+    target_path.unlink(missing_ok=True)
+    return existed

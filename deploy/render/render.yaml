@@ -23,6 +23,16 @@ services:
         value: /tmp/carewise-storage
       - key: CAREWISE_STORAGE_BACKEND
         value: local
+      - key: CAREWISE_S3_BUCKET
+        sync: false
+      - key: CAREWISE_S3_REGION
+        value: us-east-1
+      - key: CAREWISE_S3_ENDPOINT_URL
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
       - key: CAREWISE_MAX_REPORT_FILE_BYTES
         value: "10485760"
 

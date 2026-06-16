@@ -57,6 +57,12 @@ python3 -m ruff check .
 python3 tests/static_readiness_check.py
 ```
 
+Check file storage configuration:
+
+```bash
+python3 scripts/check_storage.py
+```
+
 Generate production secrets:
 
 ```bash
@@ -149,7 +155,14 @@ CAREWISE_STORAGE_BACKEND=s3
 CAREWISE_S3_BUCKET=your-private-bucket
 CAREWISE_S3_REGION=us-east-1
 CAREWISE_S3_ENDPOINT_URL= # optional, use for Cloudflare R2 or compatible providers
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
 ```
+
+Setup guides:
+
+- `deploy/storage/cloudflare-r2.md`
+- `deploy/storage/aws-s3.md`
 
 ## Privacy Endpoints
 

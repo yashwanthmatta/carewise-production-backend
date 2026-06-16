@@ -22,6 +22,7 @@ from app.models.carewise import (
 )
 from app.schemas.carewise import DataDeletionRequestIn, DataDeletionRequestOut
 from app.services.audit import write_audit
+from app.services.storage import delete_stored_file
 
 router = APIRouter()
 
@@ -137,7 +138,14 @@ def delete_my_account_data(
     profiles = db.scalars(select(PatientProfile).where(PatientProfile.user_id == user.user_id)).all()
     patient_ids = [profile.id for profile in profiles]
     if patient_ids:
-        report_ids = db.scalars(select(ReportUpload.id).where(ReportUpload.patient_id.in_(patient_ids))).all()
+        reports = db.scalars(select(ReportUpload).where(ReportUpload.patient_id.in_(patient_ids))).all()
+        report_ids = [report.id for report in reports]
+        for report in reports:
+            try:
+                delete_stored_file(report.storage_key)
+            except Exception:
+                # Keep account deletion moving; operators can reconcile object storage from audit/logs.
+                pass
         if report_ids:
             db.execute(delete(ReportAnalysis).where(ReportAnalysis.report_id.in_(report_ids)))
         db.execute(delete(ReportUpload).where(ReportUpload.patient_id.in_(patient_ids)))

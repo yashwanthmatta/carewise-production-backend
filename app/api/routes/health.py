@@ -1,5 +1,7 @@
 from fastapi import APIRouter
 
+from app.core.config import settings
+
 router = APIRouter()
 
 
@@ -11,3 +13,15 @@ def health():
 @router.get("/ready")
 def ready():
     return {"status": "ready"}
+
+
+@router.get("/features")
+def features():
+    return {
+        "storage_backend": settings.storage_backend,
+        "report_uploads": True,
+        "text_extraction": True,
+        "pdf_text_extraction": True,
+        "image_ocr": bool(settings.clean_env_value(settings.openai_api_key)),
+        "ocr_model": settings.openai_ocr_model if settings.clean_env_value(settings.openai_api_key) else "",
+    }

@@ -14,6 +14,18 @@ def test_security_headers_are_applied():
         assert response.headers["Referrer-Policy"] == "no-referrer"
 
 
+def test_features_endpoint_reports_capabilities_without_secrets():
+    app = create_app()
+    with TestClient(app) as client:
+        response = client.get("/features")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["report_uploads"] is True
+        assert payload["text_extraction"] is True
+        assert payload["pdf_text_extraction"] is True
+        assert "api_key" not in payload
+
+
 def test_privacy_export_delete_request_and_delete_flow():
     app = create_app()
     with TestClient(app) as client:

@@ -159,6 +159,17 @@ class NotificationPreference(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class DataDeletionRequest(Base):
+    __tablename__ = "data_deletion_requests"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("delete"))
+    user_id: Mapped[str] = mapped_column(String(80), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True, default="")
+    status: Mapped[str] = mapped_column(String(80), index=True, default="requested")
+    reason: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 Index("idx_care_plans_patient_created", CarePlan.patient_id, CarePlan.created_at.desc())
 Index("idx_care_plans_status_created", CarePlan.status, CarePlan.created_at.desc())
 Index("idx_audit_patient_created", AuditEvent.patient_id, AuditEvent.created_at.desc())
@@ -166,3 +177,4 @@ Index("idx_consent_user_created", ConsentRecord.user_id, ConsentRecord.created_a
 Index("idx_consent_region_created", ConsentRecord.region, ConsentRecord.created_at.desc())
 Index("idx_reports_patient_created", ReportUpload.patient_id, ReportUpload.created_at.desc())
 Index("idx_analyses_patient_created", ReportAnalysis.patient_id, ReportAnalysis.created_at.desc())
+Index("idx_deletion_requests_user_created", DataDeletionRequest.user_id, DataDeletionRequest.created_at.desc())

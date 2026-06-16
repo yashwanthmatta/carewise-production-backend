@@ -1,6 +1,8 @@
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from shutil import copyfileobj
 
 from fastapi import HTTPException, UploadFile, status
 
@@ -40,24 +42,62 @@ async def store_report_file(patient_id: str, report_id: str, file: UploadFile) -
 
     file_name = safe_file_name(file.filename or "report-upload")
     storage_key = f"reports/{patient_id}/{report_id}/{file_name}"
-    target_path = storage_root() / storage_key
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-
-    max_bytes = settings.max_report_file_bytes
-    total = 0
-    with target_path.open("wb") as output:
-        while chunk := await file.read(1024 * 1024):
-            total += len(chunk)
-            if total > max_bytes:
-                target_path.unlink(missing_ok=True)
-                raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                    detail=f"Report file is larger than the {max_bytes} byte limit.",
-                )
-            output.write(chunk)
+    temp_path = Path(tempfile.mkstemp(prefix="carewise-report-")[1])
+    try:
+        total = await write_upload_to_temp(file, temp_path)
+        if settings.storage_backend.lower() == "s3":
+            storage_url = upload_temp_file_to_s3(temp_path, storage_key, content_type)
+        else:
+            storage_url = persist_temp_file_locally(temp_path, storage_key)
+    finally:
+        temp_path.unlink(missing_ok=True)
 
     return StoredFile(
         storage_key=storage_key,
-        storage_url=f"local://{storage_key}",
+        storage_url=storage_url,
         file_size_bytes=total,
     )
+
+
+async def write_upload_to_temp(file: UploadFile, temp_path: Path) -> int:
+    total = 0
+    with temp_path.open("wb") as output:
+        while chunk := await file.read(1024 * 1024):
+            total += len(chunk)
+            if total > settings.max_report_file_bytes:
+                raise HTTPException(
+                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    detail=f"Report file is larger than the {settings.max_report_file_bytes} byte limit.",
+                )
+            output.write(chunk)
+    return total
+
+
+def persist_temp_file_locally(temp_path: Path, storage_key: str) -> str:
+    target_path = storage_root() / storage_key
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with temp_path.open("rb") as source, target_path.open("wb") as target:
+        copyfileobj(source, target)
+    return f"local://{storage_key}"
+
+
+def upload_temp_file_to_s3(temp_path: Path, storage_key: str, content_type: str) -> str:
+    if not settings.s3_bucket:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="S3 storage is enabled but CAREWISE_S3_BUCKET is not configured.",
+        )
+    import boto3
+
+    client_kwargs = {"region_name": settings.s3_region}
+    if settings.s3_endpoint_url:
+        client_kwargs["endpoint_url"] = settings.s3_endpoint_url
+    client = boto3.client("s3", **client_kwargs)
+    with temp_path.open("rb") as source:
+        client.upload_fileobj(
+            source,
+            settings.s3_bucket,
+            storage_key,
+            ExtraArgs={"ContentType": content_type, "ServerSideEncryption": "AES256"},
+        )
+    return f"s3://{settings.s3_bucket}/{storage_key}"

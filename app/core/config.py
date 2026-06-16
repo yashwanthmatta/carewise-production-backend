@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:4173,http://localhost:3000"
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
     local_storage_dir: str = "storage"
+    storage_backend: str = "local"
+    s3_bucket: str = ""
+    s3_region: str = "us-east-1"
+    s3_endpoint_url: str = ""
     max_report_file_bytes: int = 10 * 1024 * 1024
     allowed_report_content_types: str = "text/plain,application/pdf,image/png,image/jpeg,image/webp,image/heic"
 

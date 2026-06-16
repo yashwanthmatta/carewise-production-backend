@@ -20,6 +20,9 @@ It is separate from the local standard-library prototype in `outputs/carewise-ba
 - Deployment smoke-test script
 - Multipart report file upload with file-size/type controls
 - Patient ownership checks on protected patient records
+- Privacy export, deletion request, and account deletion endpoints
+- Security headers middleware
+- GitHub Actions backend CI
 - Secret generation helper
 - k6 and Locust load-test plans
 - Security/privacy review checklist
@@ -130,6 +133,7 @@ The backend now supports:
 - Content-type allow-listing
 - File-size limits through `CAREWISE_MAX_REPORT_FILE_BYTES`
 - Local object-store style paths under `CAREWISE_LOCAL_STORAGE_DIR`
+- Optional S3-compatible storage through `CAREWISE_STORAGE_BACKEND=s3`
 - Encrypted report text stored in PostgreSQL
 - File metadata stored in PostgreSQL
 
@@ -137,6 +141,26 @@ For local development this writes files to `storage/`. On Render free hosting,
 `/tmp/carewise-storage` is useful for testing but is not durable. Before real
 patient uploads, connect durable private object storage such as AWS S3,
 Cloudflare R2, or Google Cloud Storage and sign file access through the backend.
+
+S3/R2/GCS-compatible configuration:
+
+```text
+CAREWISE_STORAGE_BACKEND=s3
+CAREWISE_S3_BUCKET=your-private-bucket
+CAREWISE_S3_REGION=us-east-1
+CAREWISE_S3_ENDPOINT_URL= # optional, use for Cloudflare R2 or compatible providers
+```
+
+## Privacy Endpoints
+
+- `GET /privacy/me/export` returns the signed-in user's account, patient, consent,
+  report metadata, care plan metadata, subscriptions, notifications, and audit metadata.
+- `POST /privacy/me/delete-request` records a deletion request for app-store and
+  support workflows.
+- `DELETE /privacy/me` deletes the signed-in user's account-linked records.
+
+Do not enable real patient use until legal counsel validates retention rules,
+backup deletion behavior, audit retention, and regional privacy requirements.
 
 ## Production Warning
 

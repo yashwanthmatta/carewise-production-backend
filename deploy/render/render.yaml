@@ -21,6 +21,8 @@ services:
         value: ""
       - key: CAREWISE_LOCAL_STORAGE_DIR
         value: /tmp/carewise-storage
+      - key: CAREWISE_STORAGE_BACKEND
+        value: local
       - key: CAREWISE_MAX_REPORT_FILE_BYTES
         value: "10485760"
 

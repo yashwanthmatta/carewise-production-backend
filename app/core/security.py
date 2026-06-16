@@ -5,8 +5,11 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.db.session import get_db
+from app.models.carewise import User
 
 
 password_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -34,13 +37,19 @@ def create_access_token(user_id: str, email: str, role: str) -> str:
     return jwt.encode(payload, settings.clean_jwt_secret, algorithm="HS256")
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> CurrentUser:
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> CurrentUser:
     try:
         payload = jwt.decode(token, settings.clean_jwt_secret, algorithms=["HS256"])
+        user = db.get(User, payload["sub"])
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired authentication token.",
+            )
         return CurrentUser(
-            user_id=payload["sub"],
-            email=payload.get("email", ""),
-            role=payload.get("role", "patient"),
+            user_id=user.id,
+            email=user.email,
+            role=user.role,
         )
     except JWTError as error:
         raise HTTPException(

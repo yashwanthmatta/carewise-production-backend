@@ -12,6 +12,7 @@ from app.api.routes import (
     insurance,
     notifications,
     patients,
+    privacy,
     recommendations,
     reports,
     subscriptions,
@@ -19,6 +20,7 @@ from app.api.routes import (
 from app.core.config import settings
 from app.db.init_db import init_local_database
 from app.services.telemetry import configure_telemetry
+from app.services.security_headers import apply_security_headers
 
 
 def create_app() -> FastAPI:
@@ -35,6 +37,13 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     configure_telemetry(app)
+
+    @app.middleware("http")
+    async def security_headers_middleware(request, call_next):
+        response = await call_next(request)
+        apply_security_headers(response)
+        return response
+
     app.include_router(health.router)
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(consent.router, prefix="/consent", tags=["consent"])
@@ -47,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(insurance.router, prefix="/insurance", tags=["insurance"])
     app.include_router(subscriptions.router, prefix="/subscriptions", tags=["subscriptions"])
     app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
+    app.include_router(privacy.router, prefix="/privacy", tags=["privacy"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
     @app.on_event("startup")

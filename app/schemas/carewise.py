@@ -154,3 +154,12 @@ class NotificationPreferenceOut(BaseModel):
     id: str
     channel: str
     enabled: bool
+
+
+class DataDeletionRequestIn(BaseModel):
+    reason: str = ""
+
+
+class DataDeletionRequestOut(BaseModel):
+    id: str
+    status: str

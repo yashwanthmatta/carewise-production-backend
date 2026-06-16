@@ -107,8 +107,60 @@ class AuditEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ReportUpload(Base):
+    __tablename__ = "report_uploads"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("report"))
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    uploaded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    file_name: Mapped[str] = mapped_column(String(255), default="")
+    content_type: Mapped[str] = mapped_column(String(120), default="")
+    storage_url: Mapped[str] = mapped_column(Text, default="")
+    encrypted_report_text: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(80), index=True, default="uploaded")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReportAnalysis(Base):
+    __tablename__ = "report_analyses"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("analysis"))
+    report_id: Mapped[str] = mapped_column(ForeignKey("report_uploads.id"), index=True)
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    risk_level: Mapped[str] = mapped_column(String(80), index=True, default="routine")
+    summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    recommendations_json: Mapped[str] = mapped_column(Text, default="{}")
+    status: Mapped[str] = mapped_column(String(80), index=True, default="draft")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Subscription(Base):
+    __tablename__ = "subscriptions"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("sub"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    plan_code: Mapped[str] = mapped_column(String(80), index=True)
+    status: Mapped[str] = mapped_column(String(80), index=True, default="pending")
+    payment_provider: Mapped[str] = mapped_column(String(80), default="manual")
+    provider_reference: Mapped[str] = mapped_column(String(160), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("notify"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    channel: Mapped[str] = mapped_column(String(80), default="push")
+    device_token: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[str] = mapped_column(String(10), default="true")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 Index("idx_care_plans_patient_created", CarePlan.patient_id, CarePlan.created_at.desc())
 Index("idx_care_plans_status_created", CarePlan.status, CarePlan.created_at.desc())
 Index("idx_audit_patient_created", AuditEvent.patient_id, AuditEvent.created_at.desc())
 Index("idx_consent_user_created", ConsentRecord.user_id, ConsentRecord.created_at.desc())
 Index("idx_consent_region_created", ConsentRecord.region, ConsentRecord.created_at.desc())
+Index("idx_reports_patient_created", ReportUpload.patient_id, ReportUpload.created_at.desc())
+Index("idx_analyses_patient_created", ReportAnalysis.patient_id, ReportAnalysis.created_at.desc())

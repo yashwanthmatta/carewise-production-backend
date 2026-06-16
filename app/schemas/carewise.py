@@ -69,3 +69,85 @@ class ReviewDecisionIn(BaseModel):
 class QueueJobOut(BaseModel):
     job_id: str
     status: str
+
+
+class ReportUploadIn(BaseModel):
+    patient_id: str
+    file_name: str = ""
+    content_type: str = ""
+    report_text: str = ""
+    storage_url: str = ""
+
+
+class ReportUploadOut(BaseModel):
+    id: str
+    patient_id: str
+    file_name: str
+    status: str
+
+
+class ReportAnalysisOut(BaseModel):
+    id: str
+    report_id: str
+    patient_id: str
+    risk_level: str
+    status: str
+    summary: dict
+    recommendations: dict
+
+
+class RecommendationRequest(BaseModel):
+    patient_id: str
+    context_text: str = ""
+    diet_style: str = "flexible"
+    goals: list[str] = []
+
+
+class RecommendationOut(BaseModel):
+    patient_id: str
+    diet: list[str]
+    habits: list[str]
+    safety_notes: list[str]
+
+
+class DoctorSearchOut(BaseModel):
+    location: str
+    specialty: str
+    results: list[dict]
+    disclaimer: str
+
+
+class InsuranceMatchIn(BaseModel):
+    location_region: str = ""
+    conditions: str = ""
+    medication_needs: str = ""
+    budget_level: str = "mid"
+
+
+class InsuranceMatchOut(BaseModel):
+    matches: list[dict]
+    disclaimer: str
+
+
+class SubscriptionCheckoutIn(BaseModel):
+    plan_code: str = Field(pattern="^(basic|plus|premium)$")
+    payment_provider: str = "manual"
+
+
+class SubscriptionCheckoutOut(BaseModel):
+    id: str
+    plan_code: str
+    status: str
+    checkout_url: str
+
+
+class NotificationDeviceIn(BaseModel):
+    channel: str = "push"
+    device_token: str = ""
+    enabled: bool = True
+
+
+class NotificationPreferenceOut(BaseModel):
+    id: str
+    channel: str
+    enabled: bool

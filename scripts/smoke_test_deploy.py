@@ -67,6 +67,47 @@ def main() -> int:
             },
             token,
         )
+        report = request_json(
+            "POST",
+            f"{base_url}/reports/upload",
+            {
+                "patient_id": profile["patient_id"],
+                "file_name": "smoke-report.txt",
+                "content_type": "text/plain",
+                "report_text": "Blood pressure follow up. No chest pain. Diabetes education requested.",
+            },
+            token,
+        )
+        analysis = request_json("POST", f"{base_url}/reports/{report['id']}/analyze", token=token)
+        recommendation = request_json(
+            "POST",
+            f"{base_url}/recommendations/ai",
+            {
+                "patient_id": profile["patient_id"],
+                "context_text": "diabetes and blood pressure",
+                "diet_style": "vegetarian",
+                "goals": ["diet", "exercise"],
+            },
+            token,
+        )
+        doctors = request_json("GET", f"{base_url}/doctors/search?location=US-CA&specialty=primary%20care", token=token)
+        insurance = request_json(
+            "POST",
+            f"{base_url}/insurance/match",
+            {
+                "location_region": "US-CA",
+                "conditions": "diabetes, hypertension",
+                "budget_level": "mid",
+            },
+            token,
+        )
+        subscription = request_json("POST", f"{base_url}/subscriptions/checkout", {"plan_code": "basic"}, token)
+        notification = request_json(
+            "POST",
+            f"{base_url}/notifications/devices",
+            {"channel": "push", "device_token": "smoke-device-token", "enabled": True},
+            token,
+        )
     except urllib.error.HTTPError as exc:
         print(exc.read().decode("utf-8"), file=sys.stderr)
         return 1
@@ -84,6 +125,13 @@ def main() -> int:
                 "patient_id": profile["patient_id"],
                 "care_plan_id": care_plan["id"],
                 "risk_level": care_plan["risk_level"],
+                "report_id": report["id"],
+                "analysis_id": analysis["id"],
+                "recommendation_items": len(recommendation["diet"]),
+                "doctor_results": len(doctors["results"]),
+                "insurance_matches": len(insurance["matches"]),
+                "subscription_id": subscription["id"],
+                "notification_id": notification["id"],
             },
             indent=2,
         )

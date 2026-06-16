@@ -84,6 +84,9 @@ class ReportUploadOut(BaseModel):
     patient_id: str
     file_name: str
     status: str
+    content_type: str = ""
+    storage_url: str = ""
+    file_size_bytes: int = 0
 
 
 class ReportAnalysisOut(BaseModel):

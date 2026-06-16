@@ -1,6 +1,6 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -10,8 +10,10 @@ from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.models.carewise import ReportAnalysis, ReportUpload
 from app.schemas.carewise import ReportAnalysisOut, ReportUploadIn, ReportUploadOut
+from app.services.access_control import assert_patient_access
 from app.services.audit import write_audit
 from app.services.safety import emergency_flags, matched_conditions, requires_clinician_review
+from app.services.storage import safe_file_name, store_report_file
 
 router = APIRouter()
 
@@ -22,10 +24,11 @@ def create_report_upload(
     user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
+    assert_patient_access(db, user, payload.patient_id)
     report = ReportUpload(
         patient_id=payload.patient_id,
         uploaded_by=user.user_id,
-        file_name=payload.file_name,
+        file_name=safe_file_name(payload.file_name),
         content_type=payload.content_type,
         storage_url=payload.storage_url,
         encrypted_report_text=encrypt_field(payload.report_text),
@@ -35,7 +38,43 @@ def create_report_upload(
     db.flush()
     write_audit(db, user.user_id, payload.patient_id, "report_uploaded", "report", report.id, {"file_name": payload.file_name})
     db.commit()
-    return ReportUploadOut(id=report.id, patient_id=report.patient_id, file_name=report.file_name, status=report.status)
+    return report_out(report)
+
+
+@router.post("/upload-file", response_model=ReportUploadOut)
+async def create_report_file_upload(
+    patient_id: str = Form(...),
+    report_text: str = Form(""),
+    file: UploadFile = File(...),
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    assert_patient_access(db, user, patient_id)
+    report = ReportUpload(
+        patient_id=patient_id,
+        uploaded_by=user.user_id,
+        file_name=safe_file_name(file.filename or "report-upload"),
+        content_type=file.content_type or "",
+        encrypted_report_text=encrypt_field(report_text),
+        status="uploaded",
+    )
+    db.add(report)
+    db.flush()
+    stored_file = await store_report_file(patient_id, report.id, file)
+    report.storage_key = stored_file.storage_key
+    report.storage_url = stored_file.storage_url
+    report.file_size_bytes = str(stored_file.file_size_bytes)
+    write_audit(
+        db,
+        user.user_id,
+        patient_id,
+        "report_file_uploaded",
+        "report",
+        report.id,
+        {"file_name": report.file_name, "file_size_bytes": stored_file.file_size_bytes},
+    )
+    db.commit()
+    return report_out(report)
 
 
 @router.get("", response_model=list[ReportUploadOut])
@@ -44,13 +83,11 @@ def list_reports(
     user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
+    assert_patient_access(db, user, patient_id)
     reports = db.scalars(
         select(ReportUpload).where(ReportUpload.patient_id == patient_id).order_by(ReportUpload.created_at.desc()).limit(50)
     ).all()
-    return [
-        ReportUploadOut(id=report.id, patient_id=report.patient_id, file_name=report.file_name, status=report.status)
-        for report in reports
-    ]
+    return [report_out(report) for report in reports]
 
 
 @router.post("/{report_id}/analyze", response_model=ReportAnalysisOut)
@@ -62,6 +99,7 @@ def analyze_report(
     report = db.get(ReportUpload, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found.")
+    assert_patient_access(db, user, report.patient_id)
 
     report_text = decrypt_field(report.encrypted_report_text)
     flags = emergency_flags(report_text)
@@ -102,4 +140,16 @@ def analyze_report(
         status=analysis.status,
         summary=summary,
         recommendations=recommendations,
+    )
+
+
+def report_out(report: ReportUpload) -> ReportUploadOut:
+    return ReportUploadOut(
+        id=report.id,
+        patient_id=report.patient_id,
+        file_name=report.file_name,
+        status=report.status,
+        content_type=report.content_type,
+        storage_url=report.storage_url,
+        file_size_bytes=int(report.file_size_bytes or 0),
     )

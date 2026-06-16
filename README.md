@@ -18,6 +18,8 @@ It is separate from the local standard-library prototype in `outputs/carewise-ba
 - Alembic database migrations
 - Production Docker startup command
 - Deployment smoke-test script
+- Multipart report file upload with file-size/type controls
+- Patient ownership checks on protected patient records
 - Secret generation helper
 - k6 and Locust load-test plans
 - Security/privacy review checklist
@@ -47,6 +49,8 @@ env PATH=/Applications/Docker.app/Contents/Resources/bin:/usr/local/bin:/usr/bin
 Run tests/checks:
 
 ```bash
+python3 -m pytest
+python3 -m ruff check .
 python3 tests/static_readiness_check.py
 ```
 
@@ -103,6 +107,7 @@ Required cloud services:
 
 - Web service for API
 - Managed PostgreSQL
+- Durable object storage for real report files before real patient use
 - Secret manager or dashboard environment variables
 - HTTPS
 
@@ -115,6 +120,23 @@ python -m app.db.migrate
 ```
 
 before starting the API.
+
+## Report Storage
+
+The backend now supports:
+
+- JSON report uploads for pasted/OCR text at `POST /reports/upload`
+- Multipart file uploads at `POST /reports/upload-file`
+- Content-type allow-listing
+- File-size limits through `CAREWISE_MAX_REPORT_FILE_BYTES`
+- Local object-store style paths under `CAREWISE_LOCAL_STORAGE_DIR`
+- Encrypted report text stored in PostgreSQL
+- File metadata stored in PostgreSQL
+
+For local development this writes files to `storage/`. On Render free hosting,
+`/tmp/carewise-storage` is useful for testing but is not durable. Before real
+patient uploads, connect durable private object storage such as AWS S3,
+Cloudflare R2, or Google Cloud Storage and sign file access through the backend.
 
 ## Production Warning
 

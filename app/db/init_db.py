@@ -1,7 +1,7 @@
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
-from app.models import carewise
+from app.models import carewise  # noqa: F401
 
 
 def init_local_database() -> None:

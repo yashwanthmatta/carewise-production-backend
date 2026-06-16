@@ -5,7 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.db.base import Base
-from app.models import carewise
+from app.models import carewise  # noqa: F401
 
 config = context.config
 

@@ -5,6 +5,7 @@ from app.core.rbac import Role, require_roles
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.schemas.carewise import CarePlanOut, IntakeIn, QueueJobOut
+from app.services.access_control import assert_patient_access
 from app.services.care_plan import create_care_plan
 from app.services.queue import enqueue_care_plan_generation
 
@@ -17,6 +18,7 @@ def generate_care_plan(
     user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
+    assert_patient_access(db, user, payload.patient_id)
     return create_care_plan(db, user.user_id, payload)
 
 

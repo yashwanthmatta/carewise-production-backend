@@ -7,6 +7,7 @@ from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.models.carewise import Medication, PatientProfile
 from app.schemas.carewise import MedicationIn, PatientProfileIn
+from app.services.access_control import assert_patient_access
 from app.services.audit import write_audit
 
 router = APIRouter()
@@ -64,6 +65,7 @@ def add_medication(
     user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
     db: Session = Depends(get_db),
 ):
+    assert_patient_access(db, user, patient_id)
     medication = Medication(
         patient_id=patient_id,
         encrypted_name=encrypt_field(payload.name),

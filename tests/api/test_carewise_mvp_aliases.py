@@ -3,12 +3,12 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
-def test_healthpilot_mvp_aliases_work():
+def test_carewise_mvp_aliases_work():
     app = create_app()
     with TestClient(app) as client:
         signup = client.post(
             "/signup",
-            json={"email": "healthpilot@example.com", "password": "change-me-long-password", "role": "patient"},
+            json={"email": "carewise-mvp@example.com", "password": "change-me-long-password", "role": "patient"},
         )
         assert signup.status_code == 200
         headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
@@ -16,7 +16,7 @@ def test_healthpilot_mvp_aliases_work():
         profile = client.put(
             "/patients/me/profile",
             json={
-                "name": "HealthPilot Patient",
+                "name": "CareWise Patient",
                 "date_of_birth": "1990-01-01",
                 "sex_at_birth": "unknown",
                 "conditions": "High LDL",
@@ -51,4 +51,4 @@ def test_healthpilot_mvp_aliases_work():
 
         user_profile = client.get("/user-profile", headers=headers)
         assert user_profile.status_code == 200
-        assert user_profile.json()["profile"]["name"] == "HealthPilot Patient"
+        assert user_profile.json()["profile"]["name"] == "CareWise Patient"

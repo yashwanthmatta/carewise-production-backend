@@ -46,7 +46,7 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(health.router)
-    app.include_router(mvp.router, tags=["healthpilot-mvp"])
+    app.include_router(mvp.router, tags=["carewise-mvp"])
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(consent.router, prefix="/consent", tags=["consent"])
     app.include_router(patients.router, prefix="/patients", tags=["patients"])

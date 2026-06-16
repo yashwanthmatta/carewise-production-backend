@@ -62,6 +62,55 @@ def test_report_file_upload_and_analysis_flow():
         assert analysis_payload["summary"]["message"].endswith("This is not a diagnosis.")
 
 
+def test_text_file_upload_is_extracted_for_analysis_when_form_text_is_empty():
+    app = create_app()
+    with TestClient(app) as client:
+        headers, _ = auth_headers(client)
+        patient_id = create_profile(client, headers)
+
+        upload = client.post(
+            "/reports/upload-file",
+            data={"patient_id": patient_id},
+            files={
+                "file": (
+                    "ldl-report.txt",
+                    b"LDL cholesterol elevated. A1C normal. No chest pain.",
+                    "text/plain",
+                )
+            },
+            headers=headers,
+        )
+        assert upload.status_code == 200
+
+        analysis = client.post(f"/reports/{upload.json()['id']}/analyze", headers=headers)
+        assert analysis.status_code == 200
+        analysis_payload = analysis.json()
+        assert analysis_payload["risk_level"] == "clinician_review"
+        assert "heart_support" in analysis_payload["summary"]["detected_terms"]
+
+
+def test_unreadable_file_upload_requests_ocr_text_before_analysis():
+    app = create_app()
+    with TestClient(app) as client:
+        headers, _ = auth_headers(client)
+        patient_id = create_profile(client, headers)
+
+        upload = client.post(
+            "/reports/upload-file",
+            data={"patient_id": patient_id},
+            files={"file": ("scan.pdf", b"%PDF-1.4 fake scan", "application/pdf")},
+            headers=headers,
+        )
+        assert upload.status_code == 200
+
+        analysis = client.post(f"/reports/{upload.json()['id']}/analyze", headers=headers)
+        assert analysis.status_code == 200
+        analysis_payload = analysis.json()
+        assert analysis_payload["risk_level"] == "needs_text"
+        assert analysis_payload["status"] == "needs_readable_text"
+        assert "no readable text" in analysis_payload["summary"]["message"]
+
+
 def test_patient_cannot_access_another_patient_records():
     app = create_app()
     with TestClient(app) as client:

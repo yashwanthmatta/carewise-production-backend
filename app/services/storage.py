@@ -17,6 +17,7 @@ class StoredFile:
     storage_key: str
     storage_url: str
     file_size_bytes: int
+    extracted_text: str = ""
 
 
 def safe_file_name(file_name: str) -> str:
@@ -45,6 +46,7 @@ async def store_report_file(patient_id: str, report_id: str, file: UploadFile) -
     temp_path = Path(tempfile.mkstemp(prefix="carewise-report-")[1])
     try:
         total = await write_upload_to_temp(file, temp_path)
+        extracted_text = extract_text_from_temp_file(temp_path, content_type, file_name)
         if settings.storage_backend.lower() == "s3":
             storage_url = upload_temp_file_to_s3(temp_path, storage_key, content_type)
         else:
@@ -56,6 +58,7 @@ async def store_report_file(patient_id: str, report_id: str, file: UploadFile) -
         storage_key=storage_key,
         storage_url=storage_url,
         file_size_bytes=total,
+        extracted_text=extracted_text,
     )
 
 
@@ -79,6 +82,19 @@ def persist_temp_file_locally(temp_path: Path, storage_key: str) -> str:
     with temp_path.open("rb") as source, target_path.open("wb") as target:
         copyfileobj(source, target)
     return f"local://{storage_key}"
+
+
+def extract_text_from_temp_file(temp_path: Path, content_type: str, file_name: str) -> str:
+    if content_type != "text/plain" and not file_name.lower().endswith(".txt"):
+        return ""
+
+    raw = temp_path.read_bytes()[:120_000]
+    for encoding in ("utf-8", "utf-16", "latin-1"):
+        try:
+            return raw.decode(encoding).strip()[:12000]
+        except UnicodeDecodeError:
+            continue
+    return ""
 
 
 def upload_temp_file_to_s3(temp_path: Path, storage_key: str, content_type: str) -> str:

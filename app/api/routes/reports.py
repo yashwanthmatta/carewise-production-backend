@@ -64,6 +64,8 @@ async def create_report_file_upload(
     report.storage_key = stored_file.storage_key
     report.storage_url = stored_file.storage_url
     report.file_size_bytes = str(stored_file.file_size_bytes)
+    if not report_text.strip() and stored_file.extracted_text:
+        report.encrypted_report_text = encrypt_field(stored_file.extracted_text)
     write_audit(
         db,
         user.user_id,
@@ -102,6 +104,54 @@ def analyze_report(
     assert_patient_access(db, user, report.patient_id)
 
     report_text = decrypt_field(report.encrypted_report_text)
+    if not report_text.strip():
+        summary = {
+            "detected_terms": [],
+            "emergency_flags": [],
+            "message": (
+                "The report file was stored securely, but no readable text was available for "
+                "analysis yet. This is not a diagnosis."
+            ),
+        }
+        recommendations = {
+            "next_steps": [
+                "Paste OCR text or key lab values before relying on report analysis.",
+                "Ask a licensed clinician to review the original report.",
+                "Do not change medication or treatment based only on a stored file.",
+            ],
+            "requires_clinician_review": True,
+        }
+        analysis = ReportAnalysis(
+            report_id=report.id,
+            patient_id=report.patient_id,
+            risk_level="needs_text",
+            status="needs_readable_text",
+            summary_json=json.dumps(summary),
+            recommendations_json=json.dumps(recommendations),
+        )
+        report.status = "needs_readable_text"
+        db.add(analysis)
+        db.flush()
+        write_audit(
+            db,
+            user.user_id,
+            report.patient_id,
+            "report_analysis_needs_text",
+            "report_analysis",
+            analysis.id,
+            {},
+        )
+        db.commit()
+        return ReportAnalysisOut(
+            id=analysis.id,
+            report_id=report.id,
+            patient_id=report.patient_id,
+            risk_level=analysis.risk_level,
+            status=analysis.status,
+            summary=summary,
+            recommendations=recommendations,
+        )
+
     flags = emergency_flags(report_text)
     conditions = matched_conditions(report_text)
     needs_review = requires_clinician_review(flags, conditions)

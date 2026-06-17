@@ -12,6 +12,21 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class PasswordResetRequestIn(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetRequestOut(BaseModel):
+    status: str
+    delivery_status: str
+    reset_token: str = ""
+
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str = Field(min_length=16)
+    new_password: str = Field(min_length=12)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"

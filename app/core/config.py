@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     )
     stripe_success_url: str = "https://carewise-frontend.onrender.com/?checkout=success"
     stripe_cancel_url: str = "https://carewise-frontend.onrender.com/?checkout=cancelled"
+    password_reset_token_minutes: int = 30
     max_report_file_bytes: int = 10 * 1024 * 1024
     allowed_report_content_types: str = "text/plain,application/pdf,image/png,image/jpeg,image/webp,image/heic"
 

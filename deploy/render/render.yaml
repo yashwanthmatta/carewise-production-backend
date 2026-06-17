@@ -43,6 +43,8 @@ services:
         value: https://carewise-frontend.onrender.com/?checkout=success
       - key: CAREWISE_STRIPE_CANCEL_URL
         value: https://carewise-frontend.onrender.com/?checkout=cancelled
+      - key: CAREWISE_PASSWORD_RESET_TOKEN_MINUTES
+        value: "30"
 
 databases:
   - name: carewise-postgres

@@ -35,6 +35,18 @@ class PasswordResetToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("refresh"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(80), index=True, default="active")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class RateLimitBucket(Base):
     __tablename__ = "rate_limit_buckets"
 
@@ -203,4 +215,5 @@ Index("idx_reports_patient_created", ReportUpload.patient_id, ReportUpload.creat
 Index("idx_analyses_patient_created", ReportAnalysis.patient_id, ReportAnalysis.created_at.desc())
 Index("idx_deletion_requests_user_created", DataDeletionRequest.user_id, DataDeletionRequest.created_at.desc())
 Index("idx_password_reset_user_created", PasswordResetToken.user_id, PasswordResetToken.created_at.desc())
+Index("idx_refresh_tokens_user_created", RefreshToken.user_id, RefreshToken.created_at.desc())
 Index("idx_rate_limit_action_window", RateLimitBucket.action, RateLimitBucket.window_start.desc())

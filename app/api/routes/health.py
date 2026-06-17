@@ -30,4 +30,5 @@ def features():
         "email_delivery": settings.email_delivery_enabled,
         "auth_rate_limit": True,
         "auth_session": True,
+        "refresh_tokens": True,
     }

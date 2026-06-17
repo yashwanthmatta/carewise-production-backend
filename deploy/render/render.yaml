@@ -15,6 +15,10 @@ services:
         sync: false
       - key: CAREWISE_FIELD_ENCRYPTION_KEY
         sync: false
+      - key: CAREWISE_ACCESS_TOKEN_MINUTES
+        value: "30"
+      - key: CAREWISE_REFRESH_TOKEN_DAYS
+        value: "30"
       - key: CAREWISE_ALLOWED_ORIGINS
         sync: false
       - key: CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT

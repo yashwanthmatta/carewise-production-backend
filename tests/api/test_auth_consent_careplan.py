@@ -18,6 +18,7 @@ def test_auth_consent_profile_and_care_plan_flow():
     )
     assert signup.status_code in {200, 201}
     token = signup.json()["access_token"]
+    assert signup.json()["refresh_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
     session = client.get("/auth/me", headers=headers)
@@ -176,6 +177,34 @@ def test_login_rate_limit_blocks_repeated_attempts(monkeypatch):
     )
     assert blocked.status_code == 429
     assert blocked.headers["retry-after"]
+
+
+def test_refresh_token_rotates_and_logout_revokes():
+    app = create_app()
+    client = TestClient(app)
+
+    signup = client.post(
+        "/auth/signup",
+        json={"email": "refresh@example.com", "password": "old-password-long", "role": "patient"},
+    )
+    assert signup.status_code == 200
+    first_refresh_token = signup.json()["refresh_token"]
+    assert first_refresh_token
+
+    refresh = client.post("/auth/refresh", json={"refresh_token": first_refresh_token})
+    assert refresh.status_code == 200
+    second_refresh_token = refresh.json()["refresh_token"]
+    assert second_refresh_token
+    assert second_refresh_token != first_refresh_token
+
+    reused = client.post("/auth/refresh", json={"refresh_token": first_refresh_token})
+    assert reused.status_code == 401
+
+    logout = client.post("/auth/logout", json={"refresh_token": second_refresh_token})
+    assert logout.status_code == 200
+
+    revoked = client.post("/auth/refresh", json={"refresh_token": second_refresh_token})
+    assert revoked.status_code == 401
 
 
 def test_password_reset_request_rate_limit_blocks_repeated_attempts(monkeypatch):

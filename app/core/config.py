@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     jwt_secret: str = "replace-me"
     field_encryption_key: str = "replace-with-fernet-key"
     access_token_minutes: int = 30
+    refresh_token_days: int = 30
     allowed_origins: str = "http://localhost:4173,http://localhost:3000"
     otel_exporter_otlp_endpoint: str = "http://localhost:4317"
     local_storage_dir: str = "storage"

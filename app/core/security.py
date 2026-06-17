@@ -37,11 +37,19 @@ def create_reset_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def create_email_verification_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
 def create_refresh_token() -> str:
     return secrets.token_urlsafe(48)
 
 
 def hash_reset_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def hash_email_verification_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 

@@ -31,4 +31,5 @@ def features():
         "auth_rate_limit": True,
         "auth_session": True,
         "refresh_tokens": True,
+        "email_verification": True,
     }

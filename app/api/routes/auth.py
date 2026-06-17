@@ -8,17 +8,21 @@ from app.core.config import settings
 from app.core.security import (
     CurrentUser,
     create_access_token,
+    create_email_verification_token,
     create_refresh_token,
     create_reset_token,
     get_current_user,
+    hash_email_verification_token,
     hash_password,
     hash_refresh_token,
     hash_reset_token,
     verify_password,
 )
 from app.db.session import get_db
-from app.models.carewise import PasswordResetToken, RefreshToken, User
+from app.models.carewise import EmailVerificationToken, PasswordResetToken, RefreshToken, User
 from app.schemas.carewise import (
+    EmailVerificationConfirmIn,
+    EmailVerificationRequestOut,
     LoginRequest,
     PasswordResetConfirmIn,
     PasswordResetRequestIn,
@@ -49,6 +53,7 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
     db.add(user)
     db.flush()
     write_audit(db, user.id, "", "user_created", "user", user.id, {"role": user.role})
+    issue_email_verification(db, user)
     token_response = issue_token_pair(db, user)
     db.commit()
     return token_response
@@ -67,8 +72,53 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
 
 @router.get("/me", response_model=UserSessionOut)
-def me(user: CurrentUser = Depends(get_current_user)):
-    return UserSessionOut(id=user.user_id, email=user.email, role=user.role)
+def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    account = db.get(User, user.user_id)
+    return UserSessionOut(
+        id=user.user_id,
+        email=user.email,
+        role=user.role,
+        email_verified=account.email_verified == "true" if account else False,
+    )
+
+
+@router.post("/email-verification/request", response_model=EmailVerificationRequestOut)
+def request_email_verification(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    account = db.get(User, user.user_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired authentication token.")
+    if account.email_verified == "true":
+        return EmailVerificationRequestOut(status="ok", delivery_status="already_verified")
+    verification_token, _ = issue_email_verification(db, account)
+    db.commit()
+    response_token = verification_token if verification_token and not settings.is_production else ""
+    return EmailVerificationRequestOut(
+        status="ok",
+        delivery_status="email_queued" if settings.email_delivery_enabled else "email_provider_not_configured",
+        verification_token=response_token,
+    )
+
+
+@router.post("/email-verification/confirm", response_model=UserSessionOut)
+def confirm_email_verification(payload: EmailVerificationConfirmIn, db: Session = Depends(get_db)):
+    verification_record = db.scalar(
+        select(EmailVerificationToken).where(
+            EmailVerificationToken.token_hash == hash_email_verification_token(payload.token),
+            EmailVerificationToken.status == "active",
+            EmailVerificationToken.used_at.is_(None),
+        )
+    )
+    if verification_record is None or token_is_expired(verification_record.expires_at):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token.")
+    account = db.get(User, verification_record.user_id)
+    if account is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token.")
+    account.email_verified = "true"
+    verification_record.status = "used"
+    verification_record.used_at = datetime.now(timezone.utc)
+    write_audit(db, account.id, "", "email_verified", "user", account.id, {})
+    db.commit()
+    return UserSessionOut(id=account.id, email=account.email, role=account.role, email_verified=True)
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -187,6 +237,27 @@ def issue_token_pair(db: Session, user: User) -> TokenResponse:
         access_token=create_access_token(user.id, user.email, user.role),
         refresh_token=refresh_token,
     )
+
+
+def issue_email_verification(db: Session, user: User) -> tuple[str, str]:
+    verification_token = create_email_verification_token()
+    db.add(
+        EmailVerificationToken(
+            user_id=user.id,
+            token_hash=hash_email_verification_token(verification_token),
+            status="active",
+            expires_at=datetime.now(timezone.utc) + timedelta(minutes=settings.email_verification_token_minutes),
+        )
+    )
+    delivery_status = "email_provider_not_configured"
+    if settings.email_delivery_enabled:
+        try:
+            email_delivery.send_email_verification(user.email, verification_token)
+            delivery_status = "email_sent"
+        except Exception:
+            delivery_status = "email_failed"
+    write_audit(db, user.id, "", "email_verification_requested", "user", user.id, {"delivery_status": delivery_status})
+    return verification_token, delivery_status
 
 
 def active_refresh_token(db: Session, refresh_token: str) -> RefreshToken | None:

@@ -18,6 +18,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(40), index=True, default="patient")
+    email_verified: Mapped[str] = mapped_column(String(10), index=True, default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     patient_profile: Mapped["PatientProfile"] = relationship(back_populates="user")
@@ -39,6 +40,18 @@ class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
     id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("refresh"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(80), index=True, default="active")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EmailVerificationToken(Base):
+    __tablename__ = "email_verification_tokens"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("verify"))
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     status: Mapped[str] = mapped_column(String(80), index=True, default="active")
@@ -216,4 +229,5 @@ Index("idx_analyses_patient_created", ReportAnalysis.patient_id, ReportAnalysis.
 Index("idx_deletion_requests_user_created", DataDeletionRequest.user_id, DataDeletionRequest.created_at.desc())
 Index("idx_password_reset_user_created", PasswordResetToken.user_id, PasswordResetToken.created_at.desc())
 Index("idx_refresh_tokens_user_created", RefreshToken.user_id, RefreshToken.created_at.desc())
+Index("idx_email_verification_user_created", EmailVerificationToken.user_id, EmailVerificationToken.created_at.desc())
 Index("idx_rate_limit_action_window", RateLimitBucket.action, RateLimitBucket.window_start.desc())

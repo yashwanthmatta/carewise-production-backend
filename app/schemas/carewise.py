@@ -27,6 +27,16 @@ class PasswordResetConfirmIn(BaseModel):
     new_password: str = Field(min_length=12)
 
 
+class EmailVerificationRequestOut(BaseModel):
+    status: str
+    delivery_status: str
+    verification_token: str = ""
+
+
+class EmailVerificationConfirmIn(BaseModel):
+    token: str = Field(min_length=16)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str = ""
@@ -41,6 +51,7 @@ class UserSessionOut(BaseModel):
     id: str
     email: EmailStr
     role: str
+    email_verified: bool
 
 
 class PatientProfileIn(BaseModel):

@@ -25,6 +25,7 @@ def test_auth_consent_profile_and_care_plan_flow():
     assert session.status_code == 200
     assert session.json()["email"] == "patient@example.com"
     assert session.json()["role"] == "patient"
+    assert session.json()["email_verified"] is False
 
     consent = client.post(
         "/consent",
@@ -114,6 +115,38 @@ def test_auth_me_requires_valid_token():
 
     invalid = client.get("/auth/me", headers={"Authorization": "Bearer not-a-real-token"})
     assert invalid.status_code == 401
+
+
+def test_email_verification_flow_marks_account_verified():
+    app = create_app()
+    client = TestClient(app)
+
+    signup = client.post(
+        "/auth/signup",
+        json={"email": "verify@example.com", "password": "old-password-long", "role": "patient"},
+    )
+    assert signup.status_code == 200
+    headers = {"Authorization": f"Bearer {signup.json()['access_token']}"}
+
+    before = client.get("/auth/me", headers=headers)
+    assert before.status_code == 200
+    assert before.json()["email_verified"] is False
+
+    request = client.post("/auth/email-verification/request", headers=headers)
+    assert request.status_code == 200
+    verification_token = request.json()["verification_token"]
+    assert verification_token
+
+    confirm = client.post("/auth/email-verification/confirm", json={"token": verification_token})
+    assert confirm.status_code == 200
+    assert confirm.json()["email_verified"] is True
+
+    after = client.get("/auth/me", headers=headers)
+    assert after.status_code == 200
+    assert after.json()["email_verified"] is True
+
+    reused = client.post("/auth/email-verification/confirm", json={"token": verification_token})
+    assert reused.status_code == 400
 
 
 def test_password_reset_request_does_not_reveal_unknown_email():

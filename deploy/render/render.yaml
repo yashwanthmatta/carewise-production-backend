@@ -49,6 +49,8 @@ services:
         value: https://carewise-frontend.onrender.com/?checkout=cancelled
       - key: CAREWISE_PASSWORD_RESET_TOKEN_MINUTES
         value: "30"
+      - key: CAREWISE_EMAIL_VERIFICATION_TOKEN_MINUTES
+        value: "1440"
       - key: CAREWISE_FRONTEND_URL
         value: https://carewise-frontend.onrender.com
       - key: CAREWISE_SMTP_HOST

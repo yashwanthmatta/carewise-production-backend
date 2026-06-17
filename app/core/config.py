@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     stripe_success_url: str = "https://carewise-frontend.onrender.com/?checkout=success"
     stripe_cancel_url: str = "https://carewise-frontend.onrender.com/?checkout=cancelled"
     password_reset_token_minutes: int = 30
+    email_verification_token_minutes: int = 60 * 24
     frontend_url: str = "https://carewise-frontend.onrender.com"
     smtp_host: str = ""
     smtp_port: int = 587

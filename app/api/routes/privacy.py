@@ -11,6 +11,7 @@ from app.models.carewise import (
     CarePlan,
     ConsentRecord,
     DataDeletionRequest,
+    EmailVerificationToken,
     Intake,
     Medication,
     NotificationPreference,
@@ -161,6 +162,7 @@ def delete_my_account_data(
     db.execute(delete(Subscription).where(Subscription.user_id == user.user_id))
     db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.user_id))
     db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.user_id))
+    db.execute(delete(EmailVerificationToken).where(EmailVerificationToken.user_id == user.user_id))
     db.execute(delete(AuditEvent).where(AuditEvent.actor_id == user.user_id))
     db.execute(delete(User).where(User.id == user.user_id))
     deletion_request = DataDeletionRequest(

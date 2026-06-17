@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import (
+    CurrentUser,
     create_access_token,
     create_reset_token,
+    get_current_user,
     hash_password,
     hash_reset_token,
     verify_password,
@@ -21,6 +23,7 @@ from app.schemas.carewise import (
     PasswordResetRequestOut,
     SignupRequest,
     TokenResponse,
+    UserSessionOut,
 )
 from app.services import email_delivery
 from app.services.audit import write_audit
@@ -56,6 +59,11 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     write_audit(db, user.id, "", "user_login", "user", user.id, {})
     db.commit()
     return TokenResponse(access_token=create_access_token(user.id, user.email, user.role))
+
+
+@router.get("/me", response_model=UserSessionOut)
+def me(user: CurrentUser = Depends(get_current_user)):
+    return UserSessionOut(id=user.user_id, email=user.email, role=user.role)
 
 
 @router.post("/password-reset/request", response_model=PasswordResetRequestOut)

@@ -20,6 +20,11 @@ def test_auth_consent_profile_and_care_plan_flow():
     token = signup.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
+    session = client.get("/auth/me", headers=headers)
+    assert session.status_code == 200
+    assert session.json()["email"] == "patient@example.com"
+    assert session.json()["role"] == "patient"
+
     consent = client.post(
         "/consent",
         json={"version": "2026-06-15", "accepted": True, "region": "US-CA"},
@@ -97,6 +102,17 @@ def test_password_reset_flow_updates_password_and_prevents_reuse():
         json={"token": reset_token, "new_password": "another-password-long"},
     )
     assert reused.status_code == 400
+
+
+def test_auth_me_requires_valid_token():
+    app = create_app()
+    client = TestClient(app)
+
+    missing = client.get("/auth/me")
+    assert missing.status_code == 401
+
+    invalid = client.get("/auth/me", headers={"Authorization": "Bearer not-a-real-token"})
+    assert invalid.status_code == 401
 
 
 def test_password_reset_request_does_not_reveal_unknown_email():

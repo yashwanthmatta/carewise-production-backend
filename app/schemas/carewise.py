@@ -32,6 +32,12 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class UserSessionOut(BaseModel):
+    id: str
+    email: EmailStr
+    role: str
+
+
 class PatientProfileIn(BaseModel):
     name: str = ""
     date_of_birth: str = ""

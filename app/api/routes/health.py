@@ -25,4 +25,5 @@ def features():
         "image_ocr": bool(settings.clean_env_value(settings.openai_api_key)),
         "ocr_model": settings.openai_ocr_model if settings.clean_env_value(settings.openai_api_key) else "",
         "stripe_checkout": bool(settings.clean_env_value(settings.stripe_secret_key)),
+        "stripe_webhook": bool(settings.clean_env_value(settings.stripe_webhook_secret)),
     }

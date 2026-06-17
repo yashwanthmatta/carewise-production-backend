@@ -47,6 +47,10 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("CAREWISE_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"),
     )
+    stripe_webhook_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("CAREWISE_STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET"),
+    )
     stripe_success_url: str = "https://carewise-frontend.onrender.com/?checkout=success"
     stripe_cancel_url: str = "https://carewise-frontend.onrender.com/?checkout=cancelled"
     max_report_file_bytes: int = 10 * 1024 * 1024

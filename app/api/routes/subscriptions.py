@@ -1,9 +1,13 @@
+import hashlib
+import hmac
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -84,6 +88,53 @@ def create_checkout(
     )
 
 
+@router.post("/webhook")
+async def stripe_webhook(
+    request: Request,
+    stripe_signature: str = Header(default="", alias="Stripe-Signature"),
+    db: Session = Depends(get_db),
+):
+    webhook_secret = settings.clean_env_value(settings.stripe_webhook_secret)
+    if not webhook_secret:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe webhook is not configured.")
+
+    body = await request.body()
+    verify_stripe_signature(body, stripe_signature, webhook_secret)
+    try:
+        event = json.loads(body.decode("utf-8"))
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook JSON.") from exc
+
+    event_type = event.get("type", "")
+    event_object = event.get("data", {}).get("object", {})
+    if not isinstance(event_object, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook payload.")
+
+    subscription = subscription_for_stripe_object(db, event_object)
+    if subscription is None:
+        return {"received": True, "updated": False}
+
+    new_status = subscription_status_for_event(event_type, event_object)
+    if new_status:
+        subscription.status = new_status
+
+    provider_subscription_id = event_object.get("subscription") or event_object.get("id")
+    if isinstance(provider_subscription_id, str) and provider_subscription_id.startswith("sub_"):
+        subscription.provider_reference = provider_subscription_id
+
+    write_audit(
+        db,
+        subscription.user_id,
+        "",
+        "subscription_webhook_received",
+        "subscription",
+        subscription.id,
+        {"provider": "stripe", "event_type": event_type, "status": subscription.status},
+    )
+    db.commit()
+    return {"received": True, "updated": True, "status": subscription.status}
+
+
 def stripe_enabled() -> bool:
     return bool(settings.clean_env_value(settings.stripe_secret_key))
 
@@ -134,3 +185,53 @@ def create_stripe_checkout_session(plan: dict, subscription_id: str, customer_em
             detail="Stripe checkout session response was incomplete.",
         )
     return {"id": session_id, "url": checkout_url}
+
+
+def verify_stripe_signature(body: bytes, signature_header: str, webhook_secret: str, tolerance_seconds: int = 300) -> None:
+    timestamp = ""
+    signatures = []
+    for part in signature_header.split(","):
+        key, _, value = part.partition("=")
+        if key == "t":
+            timestamp = value
+        if key == "v1":
+            signatures.append(value)
+    if not timestamp or not signatures:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing Stripe signature.")
+
+    try:
+        timestamp_int = int(timestamp)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature timestamp.") from exc
+
+    if abs(int(time.time()) - timestamp_int) > tolerance_seconds:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expired Stripe signature.")
+
+    signed_payload = f"{timestamp}.{body.decode('utf-8')}".encode("utf-8")
+    expected = hmac.new(webhook_secret.encode("utf-8"), signed_payload, hashlib.sha256).hexdigest()
+    if not any(hmac.compare_digest(expected, signature) for signature in signatures):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature.")
+
+
+def subscription_for_stripe_object(db: Session, event_object: dict) -> Subscription | None:
+    subscription_id = event_object.get("client_reference_id") or event_object.get("metadata", {}).get("subscription_id")
+    if isinstance(subscription_id, str) and subscription_id.startswith("sub_"):
+        subscription = db.get(Subscription, subscription_id)
+        if subscription is not None:
+            return subscription
+
+    provider_reference = event_object.get("subscription") or event_object.get("id")
+    if isinstance(provider_reference, str) and provider_reference:
+        return db.scalar(select(Subscription).where(Subscription.provider_reference == provider_reference))
+    return None
+
+
+def subscription_status_for_event(event_type: str, event_object: dict) -> str:
+    if event_type == "checkout.session.completed":
+        payment_status = event_object.get("payment_status", "")
+        return "active" if payment_status in {"paid", "no_payment_required"} else "pending"
+    if event_type == "invoice.payment_failed":
+        return "past_due"
+    if event_type == "customer.subscription.deleted":
+        return "cancelled"
+    return ""

@@ -43,6 +43,12 @@ class Settings(BaseSettings):
         default="gpt-5.5",
         validation_alias=AliasChoices("CAREWISE_OPENAI_OCR_MODEL", "OPENAI_OCR_MODEL"),
     )
+    stripe_secret_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("CAREWISE_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"),
+    )
+    stripe_success_url: str = "https://carewise-frontend.onrender.com/?checkout=success"
+    stripe_cancel_url: str = "https://carewise-frontend.onrender.com/?checkout=cancelled"
     max_report_file_bytes: int = 10 * 1024 * 1024
     allowed_report_content_types: str = "text/plain,application/pdf,image/png,image/jpeg,image/webp,image/heic"
 

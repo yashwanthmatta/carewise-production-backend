@@ -172,6 +172,25 @@ Without an OCR key, images and scanned PDFs are still stored privately, but
 analysis will ask the user to paste OCR text or key lab values before relying on
 report interpretation.
 
+## Subscription Checkout
+
+The backend exposes subscription plan metadata at `GET /subscriptions/plans`.
+`POST /subscriptions/checkout` creates a manual checkout record by default. When
+`CAREWISE_STRIPE_SECRET_KEY` is configured, the same endpoint creates a Stripe
+Checkout Session in subscription mode and returns Stripe's hosted checkout URL.
+
+Stripe configuration:
+
+```text
+CAREWISE_STRIPE_SECRET_KEY=sk_test_or_live_value
+CAREWISE_STRIPE_SUCCESS_URL=https://your-frontend-domain.com/?checkout=success
+CAREWISE_STRIPE_CANCEL_URL=https://your-frontend-domain.com/?checkout=cancelled
+```
+
+Only plan, price, subscription reference, and account email are sent to Stripe.
+Health report, symptom, medication, and care-plan details must stay inside the
+CareWise backend.
+
 Setup guides:
 
 - `deploy/storage/cloudflare-r2.md`

@@ -59,6 +59,10 @@ services:
         sync: false
       - key: CAREWISE_SMTP_USE_TLS
         value: "true"
+      - key: CAREWISE_AUTH_RATE_LIMIT_WINDOW_SECONDS
+        value: "900"
+      - key: CAREWISE_AUTH_RATE_LIMIT_MAX_ATTEMPTS
+        value: "8"
 
 databases:
   - name: carewise-postgres

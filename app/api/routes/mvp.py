@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.routes.auth import login as login_user
@@ -14,13 +14,13 @@ router = APIRouter()
 
 
 @router.post("/signup", response_model=TokenResponse)
-def signup(payload: SignupRequest, db: Session = Depends(get_db)):
-    return signup_user(payload, db)
+def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_db)):
+    return signup_user(payload, request, db)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    return login_user(payload, db)
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    return login_user(payload, request, db)
 
 
 @router.post("/upload-report")

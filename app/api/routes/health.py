@@ -28,4 +28,5 @@ def features():
         "stripe_webhook": bool(settings.clean_env_value(settings.stripe_webhook_secret)),
         "password_reset": True,
         "email_delivery": settings.email_delivery_enabled,
+        "auth_rate_limit": True,
     }

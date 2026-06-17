@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -24,12 +24,14 @@ from app.schemas.carewise import (
 )
 from app.services import email_delivery
 from app.services.audit import write_audit
+from app.services.rate_limit import check_rate_limit
 
 router = APIRouter()
 
 
 @router.post("/signup", response_model=TokenResponse)
-def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(db, request, "auth_signup", payload.email)
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists.")
@@ -46,7 +48,8 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(db, request, "auth_login", payload.email)
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid login.")
@@ -56,7 +59,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/password-reset/request", response_model=PasswordResetRequestOut)
-def request_password_reset(payload: PasswordResetRequestIn, db: Session = Depends(get_db)):
+def request_password_reset(payload: PasswordResetRequestIn, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(db, request, "password_reset_request", payload.email)
     user = db.scalar(select(User).where(User.email == payload.email))
     reset_token = ""
     public_delivery_status = "email_queued" if settings.email_delivery_enabled else "email_provider_not_configured"
@@ -97,7 +101,8 @@ def request_password_reset(payload: PasswordResetRequestIn, db: Session = Depend
 
 
 @router.post("/password-reset/confirm", response_model=TokenResponse)
-def confirm_password_reset(payload: PasswordResetConfirmIn, db: Session = Depends(get_db)):
+def confirm_password_reset(payload: PasswordResetConfirmIn, request: Request, db: Session = Depends(get_db)):
+    check_rate_limit(db, request, "password_reset_confirm")
     token_hash = hash_reset_token(payload.token)
     reset_record = db.scalar(
         select(PasswordResetToken).where(

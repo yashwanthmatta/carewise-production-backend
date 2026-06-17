@@ -139,3 +139,37 @@ def test_password_reset_queues_email_when_smtp_is_configured(monkeypatch):
     assert missing.status_code == 200
     assert missing.json()["delivery_status"] == "email_queued"
     assert missing.json()["reset_token"] == ""
+
+
+def test_login_rate_limit_blocks_repeated_attempts(monkeypatch):
+    monkeypatch.setattr(settings, "auth_rate_limit_max_attempts", 2)
+    monkeypatch.setattr(settings, "auth_rate_limit_window_seconds", 900)
+    app = create_app()
+    client = TestClient(app)
+
+    for _ in range(2):
+        response = client.post(
+            "/auth/login",
+            json={"email": "rate@example.com", "password": "wrong-password-long"},
+        )
+        assert response.status_code == 401
+
+    blocked = client.post(
+        "/auth/login",
+        json={"email": "rate@example.com", "password": "wrong-password-long"},
+    )
+    assert blocked.status_code == 429
+    assert blocked.headers["retry-after"]
+
+
+def test_password_reset_request_rate_limit_blocks_repeated_attempts(monkeypatch):
+    monkeypatch.setattr(settings, "auth_rate_limit_max_attempts", 1)
+    monkeypatch.setattr(settings, "auth_rate_limit_window_seconds", 900)
+    app = create_app()
+    client = TestClient(app)
+
+    first = client.post("/auth/password-reset/request", json={"email": "missing-rate@example.com"})
+    assert first.status_code == 200
+
+    blocked = client.post("/auth/password-reset/request", json={"email": "missing-rate@example.com"})
+    assert blocked.status_code == 429

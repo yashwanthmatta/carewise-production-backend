@@ -145,6 +145,14 @@ class SubscriptionCheckoutIn(BaseModel):
     payment_provider: str = "manual"
 
 
+class SubscriptionPlanOut(BaseModel):
+    plan_code: str
+    name: str
+    monthly_price_usd: int
+    summary: str
+    features: list[str]
+
+
 class SubscriptionCheckoutOut(BaseModel):
     id: str
     plan_code: str

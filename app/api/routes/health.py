@@ -24,4 +24,5 @@ def features():
         "pdf_text_extraction": True,
         "image_ocr": bool(settings.clean_env_value(settings.openai_api_key)),
         "ocr_model": settings.openai_ocr_model if settings.clean_env_value(settings.openai_api_key) else "",
+        "stripe_checkout": bool(settings.clean_env_value(settings.stripe_secret_key)),
     }

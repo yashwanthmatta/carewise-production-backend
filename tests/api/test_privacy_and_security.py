@@ -23,7 +23,9 @@ def test_features_endpoint_reports_capabilities_without_secrets():
         assert payload["report_uploads"] is True
         assert payload["text_extraction"] is True
         assert payload["pdf_text_extraction"] is True
+        assert isinstance(payload["stripe_checkout"], bool)
         assert "api_key" not in payload
+        assert "secret" not in payload
 
 
 def test_privacy_export_delete_request_and_delete_flow():

@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.config import settings
 from app.main import create_app
 
 
@@ -106,3 +107,35 @@ def test_password_reset_request_does_not_reveal_unknown_email():
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
     assert response.json()["reset_token"] == ""
+
+
+def test_password_reset_queues_email_when_smtp_is_configured(monkeypatch):
+    sent_messages = []
+    monkeypatch.setattr(settings, "smtp_host", "smtp.example.com")
+    monkeypatch.setattr(settings, "smtp_username", "carewise")
+    monkeypatch.setattr(settings, "smtp_password", "secret")
+    monkeypatch.setattr(settings, "smtp_from_email", "support@example.com")
+    monkeypatch.setattr(
+        "app.services.email_delivery.send_password_reset_email",
+        lambda to_email, reset_token: sent_messages.append((to_email, reset_token)),
+    )
+    app = create_app()
+    client = TestClient(app)
+
+    signup = client.post(
+        "/auth/signup",
+        json={"email": "email-reset@example.com", "password": "old-password-long", "role": "patient"},
+    )
+    assert signup.status_code == 200
+
+    response = client.post("/auth/password-reset/request", json={"email": "email-reset@example.com"})
+    assert response.status_code == 200
+    assert response.json()["delivery_status"] == "email_queued"
+    assert response.json()["reset_token"]
+    assert sent_messages
+    assert sent_messages[0][0] == "email-reset@example.com"
+
+    missing = client.post("/auth/password-reset/request", json={"email": "unknown-reset@example.com"})
+    assert missing.status_code == 200
+    assert missing.json()["delivery_status"] == "email_queued"
+    assert missing.json()["reset_token"] == ""

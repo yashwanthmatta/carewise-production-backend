@@ -22,6 +22,7 @@ from app.schemas.carewise import (
     SignupRequest,
     TokenResponse,
 )
+from app.services import email_delivery
 from app.services.audit import write_audit
 
 router = APIRouter()
@@ -58,6 +59,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 def request_password_reset(payload: PasswordResetRequestIn, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.email == payload.email))
     reset_token = ""
+    public_delivery_status = "email_queued" if settings.email_delivery_enabled else "email_provider_not_configured"
+    audit_delivery_status = public_delivery_status
     if user is not None:
         reset_token = create_reset_token()
         db.add(
@@ -68,13 +71,27 @@ def request_password_reset(payload: PasswordResetRequestIn, db: Session = Depend
                 expires_at=datetime.now(timezone.utc) + timedelta(minutes=settings.password_reset_token_minutes),
             )
         )
-        write_audit(db, user.id, "", "password_reset_requested", "user", user.id, {})
+        if settings.email_delivery_enabled:
+            try:
+                email_delivery.send_password_reset_email(user.email, reset_token)
+                audit_delivery_status = "email_sent"
+            except Exception:
+                audit_delivery_status = "email_failed"
+        write_audit(
+            db,
+            user.id,
+            "",
+            "password_reset_requested",
+            "user",
+            user.id,
+            {"delivery_status": audit_delivery_status},
+        )
         db.commit()
 
     response_token = reset_token if reset_token and not settings.is_production else ""
     return PasswordResetRequestOut(
         status="ok",
-        delivery_status="email_provider_not_configured",
+        delivery_status=public_delivery_status,
         reset_token=response_token,
     )
 

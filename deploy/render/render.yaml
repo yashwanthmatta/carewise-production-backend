@@ -45,6 +45,20 @@ services:
         value: https://carewise-frontend.onrender.com/?checkout=cancelled
       - key: CAREWISE_PASSWORD_RESET_TOKEN_MINUTES
         value: "30"
+      - key: CAREWISE_FRONTEND_URL
+        value: https://carewise-frontend.onrender.com
+      - key: CAREWISE_SMTP_HOST
+        sync: false
+      - key: CAREWISE_SMTP_PORT
+        value: "587"
+      - key: CAREWISE_SMTP_USERNAME
+        sync: false
+      - key: CAREWISE_SMTP_PASSWORD
+        sync: false
+      - key: CAREWISE_SMTP_FROM_EMAIL
+        sync: false
+      - key: CAREWISE_SMTP_USE_TLS
+        value: "true"
 
 databases:
   - name: carewise-postgres

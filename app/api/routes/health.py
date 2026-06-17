@@ -27,5 +27,5 @@ def features():
         "stripe_checkout": bool(settings.clean_env_value(settings.stripe_secret_key)),
         "stripe_webhook": bool(settings.clean_env_value(settings.stripe_webhook_secret)),
         "password_reset": True,
-        "email_delivery": False,
+        "email_delivery": settings.email_delivery_enabled,
     }

@@ -9,7 +9,7 @@ from app.core.rbac import Role, require_roles
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.models.carewise import ReportAnalysis, ReportUpload
-from app.schemas.carewise import ReportAnalysisOut, ReportUploadIn, ReportUploadOut
+from app.schemas.carewise import ReportAnalysisOut, ReportTextUpdateIn, ReportUploadIn, ReportUploadOut
 from app.services.access_control import assert_patient_access
 from app.services.audit import write_audit
 from app.services.safety import emergency_flags, matched_conditions, requires_clinician_review
@@ -90,6 +90,32 @@ def list_reports(
         select(ReportUpload).where(ReportUpload.patient_id == patient_id).order_by(ReportUpload.created_at.desc()).limit(50)
     ).all()
     return [report_out(report) for report in reports]
+
+
+@router.put("/{report_id}/text", response_model=ReportUploadOut)
+def update_report_text(
+    report_id: str,
+    payload: ReportTextUpdateIn,
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    report = db.get(ReportUpload, report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    assert_patient_access(db, user, report.patient_id)
+    report.encrypted_report_text = encrypt_field(payload.report_text)
+    report.status = "uploaded"
+    write_audit(
+        db,
+        user.user_id,
+        report.patient_id,
+        "report_text_updated",
+        "report",
+        report.id,
+        {"text_length": len(payload.report_text)},
+    )
+    db.commit()
+    return report_out(report)
 
 
 @router.post("/{report_id}/analyze", response_model=ReportAnalysisOut)

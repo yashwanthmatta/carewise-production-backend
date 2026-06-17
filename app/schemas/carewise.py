@@ -89,6 +89,10 @@ class ReportUploadOut(BaseModel):
     file_size_bytes: int = 0
 
 
+class ReportTextUpdateIn(BaseModel):
+    report_text: str = Field(min_length=1, max_length=12000)
+
+
 class ReportAnalysisOut(BaseModel):
     id: str
     report_id: str

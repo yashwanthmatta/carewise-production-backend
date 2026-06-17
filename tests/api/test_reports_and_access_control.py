@@ -112,6 +112,39 @@ def test_unreadable_file_upload_requests_ocr_text_before_analysis():
         assert "no readable text" in analysis_payload["summary"]["message"]
 
 
+def test_report_text_can_be_added_after_file_upload_and_then_analyzed():
+    app = create_app()
+    with TestClient(app) as client:
+        headers, _ = auth_headers(client)
+        patient_id = create_profile(client, headers)
+
+        upload = client.post(
+            "/reports/upload-file",
+            data={"patient_id": patient_id},
+            files={"file": ("scan.pdf", b"%PDF-1.4 fake scan", "application/pdf")},
+            headers=headers,
+        )
+        assert upload.status_code == 200
+
+        first_analysis = client.post(f"/reports/{upload.json()['id']}/analyze", headers=headers)
+        assert first_analysis.status_code == 200
+        assert first_analysis.json()["status"] == "needs_readable_text"
+
+        update = client.put(
+            f"/reports/{upload.json()['id']}/text",
+            json={"report_text": "LDL cholesterol elevated. A1C normal. No chest pain."},
+            headers=headers,
+        )
+        assert update.status_code == 200
+        assert update.json()["status"] == "uploaded"
+
+        second_analysis = client.post(f"/reports/{upload.json()['id']}/analyze", headers=headers)
+        assert second_analysis.status_code == 200
+        analysis_payload = second_analysis.json()
+        assert analysis_payload["risk_level"] == "clinician_review"
+        assert "heart_support" in analysis_payload["summary"]["detected_terms"]
+
+
 def test_image_upload_uses_ocr_text_for_analysis_when_extractor_is_available(monkeypatch):
     monkeypatch.setattr(
         storage,
@@ -198,3 +231,22 @@ def test_patient_cannot_access_another_patient_records():
             headers=other_headers,
         )
         assert report.status_code == 403
+
+        owner_report = client.post(
+            "/reports/upload",
+            json={
+                "patient_id": owner_patient_id,
+                "file_name": "owner-report.txt",
+                "content_type": "text/plain",
+                "report_text": "Blood pressure report",
+            },
+            headers=owner_headers,
+        )
+        assert owner_report.status_code == 200
+
+        blocked_text_update = client.put(
+            f"/reports/{owner_report.json()['id']}/text",
+            json={"report_text": "LDL elevated"},
+            headers=other_headers,
+        )
+        assert blocked_text_update.status_code == 403

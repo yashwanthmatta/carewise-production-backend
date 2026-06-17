@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.main import create_app
+from app.api.routes import health
 from tests.api.test_reports_and_access_control import auth_headers, create_profile
 
 
@@ -12,6 +13,28 @@ def test_security_headers_are_applied():
         assert response.headers["X-Content-Type-Options"] == "nosniff"
         assert response.headers["X-Frame-Options"] == "DENY"
         assert response.headers["Referrer-Policy"] == "no-referrer"
+
+
+def test_ready_endpoint_checks_dependencies():
+    app = create_app()
+    with TestClient(app) as client:
+        response = client.get("/ready")
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "ready"
+        assert payload["checks"]["database"] is True
+        assert payload["checks"]["configuration"] is True
+        assert payload["checks"]["storage"] is True
+
+
+def test_ready_endpoint_returns_503_when_dependency_fails(monkeypatch):
+    monkeypatch.setattr(health, "database_ready", lambda: False)
+    app = create_app()
+    with TestClient(app) as client:
+        response = client.get("/ready")
+        assert response.status_code == 503
+        assert response.json()["detail"]["status"] == "not_ready"
+        assert response.json()["detail"]["checks"]["database"] is False
 
 
 def test_features_endpoint_reports_capabilities_without_secrets():

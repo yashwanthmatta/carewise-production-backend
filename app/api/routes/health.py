@@ -1,6 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
+from sqlalchemy import text
 
 from app.core.config import settings
+from app.db.session import SessionLocal
 
 router = APIRouter()
 
@@ -12,7 +14,17 @@ def health():
 
 @router.get("/ready")
 def ready():
-    return {"status": "ready"}
+    checks = {
+        "database": database_ready(),
+        "configuration": configuration_ready(),
+        "storage": storage_ready(),
+    }
+    if not all(checks.values()):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"status": "not_ready", "checks": checks},
+        )
+    return {"status": "ready", "checks": checks}
 
 
 @router.get("/features")
@@ -33,3 +45,31 @@ def features():
         "refresh_tokens": True,
         "email_verification": True,
     }
+
+
+def database_ready() -> bool:
+    try:
+        with SessionLocal() as db:
+            db.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
+
+
+def configuration_ready() -> bool:
+    try:
+        settings.validate_for_startup()
+        return True
+    except RuntimeError:
+        return False
+
+
+def storage_ready() -> bool:
+    if settings.storage_backend == "local":
+        return bool(settings.clean_env_value(settings.local_storage_dir))
+    if settings.storage_backend == "s3":
+        return bool(
+            settings.clean_env_value(settings.s3_bucket)
+            and settings.clean_env_value(settings.s3_endpoint_url)
+        )
+    return False

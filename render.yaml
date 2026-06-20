@@ -23,8 +23,6 @@ services:
         sync: false
       - key: CAREWISE_OTEL_EXPORTER_OTLP_ENDPOINT
         value: ""
-      - key: CAREWISE_LOCAL_STORAGE_DIR
-        value: /tmp/carewise-storage
       - key: CAREWISE_STORAGE_BACKEND
         value: s3
       - key: CAREWISE_S3_BUCKET

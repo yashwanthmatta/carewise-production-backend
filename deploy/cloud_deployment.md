@@ -54,13 +54,27 @@ http://localhost:4173,http://localhost:3000
 ## Render Upload Steps
 
 1. Push this backend folder to GitHub.
-2. In Render, create a Blueprint from `deploy/render/render.yaml`, or create services manually.
+2. In Render, create a Blueprint from root `render.yaml`, or use `deploy/render/render.yaml` if you prefer a nested Blueprint path.
 3. Create managed PostgreSQL.
 4. Set `CAREWISE_JWT_SECRET` and `CAREWISE_FIELD_ENCRYPTION_KEY` from `scripts/generate_secrets.py`.
 5. Set `CAREWISE_ALLOWED_ORIGINS` to the deployed frontend URL.
-6. Deploy the API service.
-7. Open `/health` on the API URL.
-8. Run:
+6. Set durable storage variables:
+
+```text
+CAREWISE_STORAGE_BACKEND=s3
+CAREWISE_S3_BUCKET=carewise-private-reports
+CAREWISE_S3_REGION=us-east-1
+CAREWISE_S3_ENDPOINT_URL=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+AWS_ACCESS_KEY_ID=<R2_ACCESS_KEY_ID>
+AWS_SECRET_ACCESS_KEY=<R2_SECRET_ACCESS_KEY>
+```
+
+For AWS S3, leave `CAREWISE_S3_ENDPOINT_URL` blank and use AWS credentials
+scoped to the private bucket.
+
+7. Deploy the API service.
+8. Open `/health`, `/features`, and `/ready` on the API URL.
+9. Run:
 
 ```bash
 python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL

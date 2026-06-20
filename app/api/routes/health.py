@@ -29,8 +29,11 @@ def ready():
 
 @router.get("/features")
 def features():
+    storage_config = settings.storage_configuration
     return {
         "storage_backend": settings.storage_backend,
+        "durable_storage": bool(storage_config["durable"]),
+        "storage_ready": bool(storage_config["ready"]),
         "report_uploads": True,
         "text_extraction": True,
         "pdf_text_extraction": True,
@@ -65,11 +68,4 @@ def configuration_ready() -> bool:
 
 
 def storage_ready() -> bool:
-    if settings.storage_backend == "local":
-        return bool(settings.clean_env_value(settings.local_storage_dir))
-    if settings.storage_backend == "s3":
-        return bool(
-            settings.clean_env_value(settings.s3_bucket)
-            and settings.clean_env_value(settings.s3_endpoint_url)
-        )
-    return False
+    return bool(settings.storage_configuration["ready"])

@@ -110,13 +110,14 @@ Read:
 ```text
 deploy/cloud_deployment.md
 deploy/render/render.yaml
+render.yaml
 ```
 
 Required cloud services:
 
 - Web service for API
 - Managed PostgreSQL
-- Durable object storage for real report files before real patient use
+- Durable private object storage for report files, such as Cloudflare R2 or AWS S3
 - Secret manager or dashboard environment variables
 - HTTPS
 
@@ -145,10 +146,10 @@ The backend now supports:
 - Encrypted report text stored in PostgreSQL
 - File metadata stored in PostgreSQL
 
-For local development this writes files to `storage/`. On Render free hosting,
-`/tmp/carewise-storage` is useful for testing but is not durable. Before real
-patient uploads, connect durable private object storage such as AWS S3,
-Cloudflare R2, or Google Cloud Storage and sign file access through the backend.
+For local development this writes files to `storage/`. The production Render
+Blueprint now expects S3-compatible durable storage. For CareWise, use
+Cloudflare R2 first if you want S3-compatible storage with a generous free tier,
+or AWS S3 when you are ready for a HIPAA-aligned AWS architecture.
 
 S3/R2/GCS-compatible configuration:
 
@@ -160,6 +161,9 @@ CAREWISE_S3_ENDPOINT_URL= # optional, use for Cloudflare R2 or compatible provid
 AWS_ACCESS_KEY_ID=...
 AWS_SECRET_ACCESS_KEY=...
 ```
+
+After deploy, `/features` should show `"durable_storage": true` and
+`"storage_ready": true`. `/ready` should return status `ready`.
 
 Optional OCR configuration:
 

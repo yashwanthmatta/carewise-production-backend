@@ -36,6 +36,14 @@ class Settings(BaseSettings):
     s3_bucket: str = ""
     s3_region: str = "us-east-1"
     s3_endpoint_url: str = ""
+    aws_access_key_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("AWS_ACCESS_KEY_ID", "CAREWISE_AWS_ACCESS_KEY_ID"),
+    )
+    aws_secret_access_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("AWS_SECRET_ACCESS_KEY", "CAREWISE_AWS_SECRET_ACCESS_KEY"),
+    )
     openai_api_key: str = Field(
         default="",
         validation_alias=AliasChoices("CAREWISE_OPENAI_API_KEY", "OPENAI_API_KEY"),
@@ -120,6 +128,41 @@ class Settings(BaseSettings):
             )
         )
 
+    @property
+    def storage_configuration(self) -> dict[str, str | bool]:
+        backend = self.clean_env_value(self.storage_backend).lower()
+        if backend == "local":
+            durable = False
+            ready = bool(self.clean_env_value(self.local_storage_dir))
+            missing = [] if ready else ["CAREWISE_LOCAL_STORAGE_DIR"]
+        elif backend == "s3":
+            durable = True
+            required = {
+                "CAREWISE_S3_BUCKET": self.s3_bucket,
+                "CAREWISE_S3_REGION": self.s3_region,
+                "AWS_ACCESS_KEY_ID": self.aws_access_key_id,
+                "AWS_SECRET_ACCESS_KEY": self.aws_secret_access_key,
+            }
+            missing = [
+                name
+                for name, value in required.items()
+                if self.clean_env_value(value) in PLACEHOLDER_VALUES
+            ]
+            ready = not missing
+        else:
+            durable = False
+            ready = False
+            missing = ["CAREWISE_STORAGE_BACKEND"]
+
+        return {
+            "backend": backend,
+            "durable": durable,
+            "ready": ready,
+            "missing": ",".join(missing),
+            "bucket_configured": bool(self.clean_env_value(self.s3_bucket)),
+            "endpoint_configured": bool(self.clean_env_value(self.s3_endpoint_url)),
+        }
+
     def validate_for_startup(self) -> None:
         if not self.allowed_origin_list:
             raise RuntimeError("CAREWISE_ALLOWED_ORIGINS must include at least one frontend origin.")
@@ -134,6 +177,10 @@ class Settings(BaseSettings):
 
         if "localhost" in self.sqlalchemy_database_url or "@localhost" in self.sqlalchemy_database_url:
             missing.append("CAREWISE_DATABASE_URL production host")
+
+        storage_config = self.storage_configuration
+        if not storage_config["ready"]:
+            missing.extend(str(storage_config["missing"]).split(","))
 
         if missing:
             raise RuntimeError(

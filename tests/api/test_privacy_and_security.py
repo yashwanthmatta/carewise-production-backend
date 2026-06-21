@@ -76,12 +76,18 @@ def test_privacy_export_delete_request_and_delete_flow():
         )
         assert report.status_code == 200
 
+        analysis = client.post(f"/reports/{report.json()['id']}/analyze", headers=headers)
+        assert analysis.status_code == 200
+
         export = client.get("/privacy/me/export", headers=headers)
         assert export.status_code == 200
         export_payload = export.json()
         assert export_payload["account"]["email"] == email
         assert len(export_payload["patients"]) == 1
         assert len(export_payload["reports"]) == 1
+        assert len(export_payload["report_analyses"]) == 1
+        assert export_payload["report_analyses"][0]["id"] == analysis.json()["id"]
+        assert export_payload["report_analyses"][0]["summary"]["message"].endswith("This is not a diagnosis.")
         assert "storage_url" not in export_payload["reports"][0]
 
         delete_request = client.post(

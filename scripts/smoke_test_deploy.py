@@ -165,8 +165,8 @@ def main() -> int:
             token,
         )
         export = request_json("GET", f"{base_url}/privacy/me/export", token=token)
-        if export["account"]["email"] != email or not export["patients"] or not export["reports"]:
-            raise RuntimeError("Privacy export did not include the smoke-test account, patient, and reports.")
+        if export["account"]["email"] != email or not export["patients"] or not export["reports"] or not export["report_analyses"]:
+            raise RuntimeError("Privacy export did not include the smoke-test account, patient, reports, and analyses.")
         deletion = {"status": "skipped"}
         if not args.keep_data:
             deletion = request_json("DELETE", f"{base_url}/privacy/me", token=token)
@@ -206,6 +206,7 @@ def main() -> int:
                 "subscription_id": subscription["id"],
                 "notification_id": notification["id"],
                 "privacy_export_reports": len(export["reports"]),
+                "privacy_export_analyses": len(export["report_analyses"]),
                 "cleanup": deletion["status"],
             },
             indent=2,

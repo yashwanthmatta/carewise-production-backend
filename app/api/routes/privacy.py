@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -41,6 +43,11 @@ def export_my_data(
     subscriptions = db.scalars(select(Subscription).where(Subscription.user_id == user.user_id)).all()
     notifications = db.scalars(select(NotificationPreference).where(NotificationPreference.user_id == user.user_id)).all()
     reports = db.scalars(select(ReportUpload).where(ReportUpload.patient_id.in_(patient_ids))).all() if patient_ids else []
+    report_analyses = (
+        db.scalars(select(ReportAnalysis).where(ReportAnalysis.patient_id.in_(patient_ids))).all()
+        if patient_ids
+        else []
+    )
     care_plans = db.scalars(select(CarePlan).where(CarePlan.patient_id.in_(patient_ids))).all() if patient_ids else []
     audit_events = db.scalars(select(AuditEvent).where(AuditEvent.actor_id == user.user_id).limit(100)).all()
 
@@ -81,6 +88,19 @@ def export_my_data(
                 "status": report.status,
             }
             for report in reports
+        ],
+        "report_analyses": [
+            {
+                "id": analysis.id,
+                "report_id": analysis.report_id,
+                "patient_id": analysis.patient_id,
+                "risk_level": analysis.risk_level,
+                "status": analysis.status,
+                "summary": safe_json_loads(analysis.summary_json),
+                "recommendations": safe_json_loads(analysis.recommendations_json),
+                "created_at": analysis.created_at,
+            }
+            for analysis in report_analyses
         ],
         "care_plans": [
             {
@@ -173,3 +193,11 @@ def delete_my_account_data(
     db.add(deletion_request)
     db.commit()
     return {"status": "deleted", "deletion_request_id": deletion_request.id}
+
+
+def safe_json_loads(value: str) -> dict | list:
+    try:
+        loaded = json.loads(value or "{}")
+    except json.JSONDecodeError:
+        return {}
+    return loaded if isinstance(loaded, dict | list) else {}

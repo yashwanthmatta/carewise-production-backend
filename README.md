@@ -216,7 +216,8 @@ Setup guides:
 ## Privacy Endpoints
 
 - `GET /privacy/me/export` returns the signed-in user's account, patient, consent,
-  report metadata, care plan metadata, subscriptions, notifications, and audit metadata.
+  report metadata, saved report analyses, care plan metadata, subscriptions,
+  notifications, and audit metadata. It does not expose private storage URLs.
 - `POST /privacy/me/delete-request` records a deletion request for app-store and
   support workflows.
 - `DELETE /privacy/me` deletes the signed-in user's account-linked records.

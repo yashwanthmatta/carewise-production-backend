@@ -1,0 +1,25 @@
+name: Live Backend Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Live CareWise API URL
+        required: true
+        default: https://carewise-api.onrender.com
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run live backend smoke test
+        run: python scripts/smoke_test_deploy.py --base-url "${{ inputs.base_url }}"

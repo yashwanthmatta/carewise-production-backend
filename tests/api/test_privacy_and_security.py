@@ -79,6 +79,26 @@ def test_privacy_export_delete_request_and_delete_flow():
         analysis = client.post(f"/reports/{report.json()['id']}/analyze", headers=headers)
         assert analysis.status_code == 200
 
+        medication = client.post(
+            f"/patients/{patient_id}/medications",
+            json={"name": "Metformin", "dose": "500 mg", "timing": "Morning", "notes": "Export test"},
+            headers=headers,
+        )
+        assert medication.status_code == 200
+
+        care_plan = client.post(
+            "/care-plans/generate",
+            json={
+                "patient_id": patient_id,
+                "symptom_text": "I need help preparing questions for high blood pressure. No chest pain.",
+                "goals": ["Doctor visit preparation"],
+                "diet_style": "vegetarian",
+                "activity_level": "light",
+            },
+            headers=headers,
+        )
+        assert care_plan.status_code == 200
+
         export = client.get("/privacy/me/export", headers=headers)
         assert export.status_code == 200
         export_payload = export.json()
@@ -88,6 +108,13 @@ def test_privacy_export_delete_request_and_delete_flow():
         assert len(export_payload["report_analyses"]) == 1
         assert export_payload["report_analyses"][0]["id"] == analysis.json()["id"]
         assert export_payload["report_analyses"][0]["summary"]["message"].endswith("This is not a diagnosis.")
+        assert len(export_payload["medications"]) == 1
+        assert export_payload["medications"][0]["name"] == "Metformin"
+        assert len(export_payload["intakes"]) == 1
+        assert export_payload["intakes"][0]["diet_style"] == "vegetarian"
+        assert len(export_payload["care_plans"]) == 1
+        assert export_payload["care_plans"][0]["id"] == care_plan.json()["id"]
+        assert export_payload["care_plans"][0]["recommendation"]
         assert "storage_url" not in export_payload["reports"][0]
 
         delete_request = client.post(

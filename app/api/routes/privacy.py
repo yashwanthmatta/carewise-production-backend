@@ -48,6 +48,8 @@ def export_my_data(
         if patient_ids
         else []
     )
+    medications = db.scalars(select(Medication).where(Medication.patient_id.in_(patient_ids))).all() if patient_ids else []
+    intakes = db.scalars(select(Intake).where(Intake.patient_id.in_(patient_ids))).all() if patient_ids else []
     care_plans = db.scalars(select(CarePlan).where(CarePlan.patient_id.in_(patient_ids))).all() if patient_ids else []
     audit_events = db.scalars(select(AuditEvent).where(AuditEvent.actor_id == user.user_id).limit(100)).all()
 
@@ -102,13 +104,44 @@ def export_my_data(
             }
             for analysis in report_analyses
         ],
+        "medications": [
+            {
+                "id": medication.id,
+                "patient_id": medication.patient_id,
+                "name": decrypt_field(medication.encrypted_name),
+                "dose": decrypt_field(medication.encrypted_dose),
+                "timing": decrypt_field(medication.encrypted_timing),
+                "refill_date": medication.refill_date,
+                "notes": decrypt_field(medication.encrypted_notes),
+                "created_at": medication.created_at,
+            }
+            for medication in medications
+        ],
+        "intakes": [
+            {
+                "id": intake.id,
+                "patient_id": intake.patient_id,
+                "symptom_text": decrypt_field(intake.encrypted_symptom_text),
+                "goals": safe_json_loads(intake.goals_json),
+                "diet_style": intake.diet_style,
+                "activity_level": intake.activity_level,
+                "created_at": intake.created_at,
+            }
+            for intake in intakes
+        ],
         "care_plans": [
             {
                 "id": plan.id,
                 "patient_id": plan.patient_id,
+                "intake_id": plan.intake_id,
                 "risk_level": plan.risk_level,
                 "status": plan.status,
+                "emergency_flags": safe_json_loads(plan.emergency_flags_json),
+                "matched_conditions": safe_json_loads(plan.matched_conditions_json),
+                "recommendation": safe_json_loads(plan.recommendation_json),
+                "clinician_note": plan.clinician_note,
                 "created_at": plan.created_at,
+                "reviewed_at": plan.reviewed_at,
             }
             for plan in care_plans
         ],

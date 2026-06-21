@@ -107,6 +107,17 @@ def main() -> int:
             },
             token,
         )
+        medication = request_json(
+            "POST",
+            f"{base_url}/patients/{profile['patient_id']}/medications",
+            {
+                "name": "Smoke test medication",
+                "dose": "Test dose",
+                "timing": "Morning",
+                "notes": "Created by deploy smoke test.",
+            },
+            token,
+        )
         report = request_json(
             "POST",
             f"{base_url}/reports/upload",
@@ -165,8 +176,16 @@ def main() -> int:
             token,
         )
         export = request_json("GET", f"{base_url}/privacy/me/export", token=token)
-        if export["account"]["email"] != email or not export["patients"] or not export["reports"] or not export["report_analyses"]:
-            raise RuntimeError("Privacy export did not include the smoke-test account, patient, reports, and analyses.")
+        if (
+            export["account"]["email"] != email
+            or not export["patients"]
+            or not export["reports"]
+            or not export["report_analyses"]
+            or not export["medications"]
+            or not export["intakes"]
+            or not export["care_plans"]
+        ):
+            raise RuntimeError("Privacy export did not include the smoke-test account, patient, reports, analyses, medications, intakes, and care plans.")
         deletion = {"status": "skipped"}
         if not args.keep_data:
             deletion = request_json("DELETE", f"{base_url}/privacy/me", token=token)
@@ -195,6 +214,7 @@ def main() -> int:
                 "patient_id": profile["patient_id"],
                 "care_plan_id": care_plan["id"],
                 "risk_level": care_plan["risk_level"],
+                "medication_id": medication["id"],
                 "report_id": report["id"],
                 "analysis_id": analysis["id"],
                 "saved_analyses": len(analyses),
@@ -207,6 +227,9 @@ def main() -> int:
                 "notification_id": notification["id"],
                 "privacy_export_reports": len(export["reports"]),
                 "privacy_export_analyses": len(export["report_analyses"]),
+                "privacy_export_medications": len(export["medications"]),
+                "privacy_export_intakes": len(export["intakes"]),
+                "privacy_export_care_plans": len(export["care_plans"]),
                 "cleanup": deletion["status"],
             },
             indent=2,

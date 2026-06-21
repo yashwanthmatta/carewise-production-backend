@@ -79,7 +79,7 @@ REQUIRED_STRINGS = {
     "deploy/aws/ecs-task-definition.json": ["CAREWISE_ALLOWED_ORIGINS", "CAREWISE_FIELD_ENCRYPTION_KEY"],
     "deploy/gcp/cloud-run-service.yaml": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY"],
     "scripts/generate_secrets.py": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY"],
-    "scripts/smoke_test_deploy.py": ["/auth/signup", "/patients/me/profile", "/care-plans/generate", "/reports/upload", "/insurance/match"],
+    "scripts/smoke_test_deploy.py": ["/ready", "/features", "request_multipart", "/reports/upload-file", "/download", "/insurance/match"],
     ".gitignore": [".env", ".venv", "*.sqlite"],
     "GITHUB_UPLOAD_STEPS.md": ["git init", "git push", "carewise-production-backend"],
     "tests/api/test_auth_consent_careplan.py": ["TestClient", "/auth/signup", "/consent", "/care-plans/generate"],

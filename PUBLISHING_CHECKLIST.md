@@ -21,7 +21,7 @@ This checklist is the current path from MVP to Android/iOS submission.
   - `GET /health` returns `ok`.
   - `GET /features` shows `durable_storage: true`.
   - `GET /ready` returns `ready`.
-  - `python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL` passes.
+  - `python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL` passes, including multipart file upload and protected download.
 
 ## Web Frontend
 

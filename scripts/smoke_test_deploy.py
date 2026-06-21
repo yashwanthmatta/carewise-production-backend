@@ -17,6 +17,39 @@ def request_json(method: str, url: str, payload: Optional[dict] = None, token: s
         return json.loads(response.read().decode("utf-8"))
 
 
+def request_multipart(url: str, fields: dict[str, str], file_field: str, file_name: str, file_bytes: bytes, content_type: str, token: str = "") -> dict:
+    boundary = f"----carewise-smoke-{int(time.time())}"
+    body_parts: list[bytes] = []
+    for name, value in fields.items():
+        body_parts.extend(
+            [
+                f"--{boundary}\r\n".encode("utf-8"),
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"),
+                value.encode("utf-8"),
+                b"\r\n",
+            ]
+        )
+    body_parts.extend(
+        [
+            f"--{boundary}\r\n".encode("utf-8"),
+            (
+                f'Content-Disposition: form-data; name="{file_field}"; '
+                f'filename="{file_name}"\r\n'
+            ).encode("utf-8"),
+            f"Content-Type: {content_type}\r\n\r\n".encode("utf-8"),
+            file_bytes,
+            b"\r\n",
+            f"--{boundary}--\r\n".encode("utf-8"),
+        ]
+    )
+    headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(url, data=b"".join(body_parts), headers=headers, method="POST")
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Smoke-test a deployed CareWise API.")
     parser.add_argument("--base-url", required=True, help="Example: https://carewise-api.onrender.com")
@@ -29,6 +62,8 @@ def main() -> int:
 
     try:
         health = request_json("GET", f"{base_url}/health")
+        features = request_json("GET", f"{base_url}/features")
+        ready = request_json("GET", f"{base_url}/ready")
         signup = request_json(
             "POST",
             f"{base_url}/auth/signup",
@@ -79,6 +114,19 @@ def main() -> int:
             token,
         )
         analysis = request_json("POST", f"{base_url}/reports/{report['id']}/analyze", token=token)
+        file_report = request_multipart(
+            f"{base_url}/reports/upload-file",
+            fields={
+                "patient_id": profile["patient_id"],
+                "report_text": "LDL cholesterol elevated. No chest pain.",
+            },
+            file_field="file",
+            file_name="smoke-file-report.txt",
+            file_bytes=b"LDL cholesterol elevated. No chest pain.",
+            content_type="text/plain",
+            token=token,
+        )
+        download = request_json("GET", f"{base_url}/reports/{file_report['id']}/download", token=token)
         recommendation = request_json(
             "POST",
             f"{base_url}/recommendations/ai",
@@ -120,6 +168,14 @@ def main() -> int:
             {
                 "status": "passed",
                 "health": health,
+                "ready": ready,
+                "features": {
+                    "durable_storage": features.get("durable_storage"),
+                    "storage_ready": features.get("storage_ready"),
+                    "report_uploads": features.get("report_uploads"),
+                    "image_ocr": features.get("image_ocr"),
+                    "stripe_checkout": features.get("stripe_checkout"),
+                },
                 "signup_email": email,
                 "consent_id": consent["id"],
                 "patient_id": profile["patient_id"],
@@ -127,6 +183,8 @@ def main() -> int:
                 "risk_level": care_plan["risk_level"],
                 "report_id": report["id"],
                 "analysis_id": analysis["id"],
+                "file_report_id": file_report["id"],
+                "download_url_kind": "private" if download["download_url"].startswith(("http://", "https://")) else "local",
                 "recommendation_items": len(recommendation["diet"]),
                 "doctor_results": len(doctors["results"]),
                 "insurance_matches": len(insurance["matches"]),

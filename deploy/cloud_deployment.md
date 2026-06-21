@@ -80,7 +80,9 @@ scoped to the private bucket.
 python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL
 ```
 
-The smoke test signs up a test patient, records consent, creates a profile, and generates a care plan.
+The smoke test signs up a test patient, records consent, creates a profile,
+generates a care plan, analyzes report text, uploads a report file, verifies
+protected report download access, and checks the main marketplace/mobile APIs.
 
 ## Database Migrations
 

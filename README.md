@@ -137,6 +137,7 @@ The backend now supports:
 
 - JSON report uploads for pasted/OCR text at `POST /reports/upload`
 - Multipart file uploads at `POST /reports/upload-file`
+- Protected file access through `GET /reports/{report_id}/download`
 - Content-type allow-listing
 - File-size limits through `CAREWISE_MAX_REPORT_FILE_BYTES`
 - Local object-store style paths under `CAREWISE_LOCAL_STORAGE_DIR`
@@ -145,6 +146,9 @@ The backend now supports:
 - Optional OpenAI vision OCR for report images when `CAREWISE_OPENAI_API_KEY` is set
 - Encrypted report text stored in PostgreSQL
 - File metadata stored in PostgreSQL
+
+Original file downloads are access-controlled by patient ownership and return a
+short-lived URL. Do not expose private bucket paths directly in frontend code.
 
 For local development this writes files to `storage/`. The production Render
 Blueprint now expects S3-compatible durable storage. For CareWise, use

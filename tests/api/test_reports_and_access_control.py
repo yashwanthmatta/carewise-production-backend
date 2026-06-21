@@ -63,6 +63,37 @@ def test_report_file_upload_and_analysis_flow():
         assert analysis_payload["summary"]["message"].endswith("This is not a diagnosis.")
 
 
+def test_report_download_url_requires_patient_access():
+    app = create_app()
+    with TestClient(app) as client:
+        owner_headers, _ = auth_headers(client)
+        other_headers, _ = auth_headers(client)
+        owner_patient_id = create_profile(client, owner_headers, "Owner Patient")
+        create_profile(client, other_headers, "Other Patient")
+
+        upload = client.post(
+            "/reports/upload-file",
+            data={
+                "patient_id": owner_patient_id,
+                "report_text": "LDL cholesterol elevated. No chest pain.",
+            },
+            files={"file": ("owner-report.txt", b"LDL cholesterol elevated.", "text/plain")},
+            headers=owner_headers,
+        )
+        assert upload.status_code == 200
+
+        download = client.get(f"/reports/{upload.json()['id']}/download", headers=owner_headers)
+        assert download.status_code == 200
+        download_payload = download.json()
+        assert download_payload["report_id"] == upload.json()["id"]
+        assert download_payload["file_name"] == "owner-report.txt"
+        assert download_payload["download_url"].startswith("local://reports/")
+        assert download_payload["expires_in_seconds"] == 900
+
+        blocked = client.get(f"/reports/{upload.json()['id']}/download", headers=other_headers)
+        assert blocked.status_code == 403
+
+
 def test_text_file_upload_is_extracted_for_analysis_when_form_text_is_empty():
     app = create_app()
     with TestClient(app) as client:

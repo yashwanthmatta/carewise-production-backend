@@ -31,6 +31,7 @@ This checklist is the current path from MVP to Android/iOS submission.
   - Signup/login.
   - Report text analysis.
   - Secure report upload when signed in.
+  - Protected report download/open flow.
   - History.
   - Profile.
 

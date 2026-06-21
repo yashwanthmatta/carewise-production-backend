@@ -211,6 +211,40 @@ def upload_temp_file_to_s3(temp_path: Path, storage_key: str, content_type: str)
     return f"s3://{settings.s3_bucket}/{storage_key}"
 
 
+def create_download_url(storage_key: str, expires_in_seconds: int = 900) -> str:
+    if not storage_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report file is not available for download.",
+        )
+
+    if settings.storage_backend.lower() == "s3":
+        if not settings.s3_bucket:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="S3 storage is enabled but CAREWISE_S3_BUCKET is not configured.",
+            )
+        import boto3
+
+        client_kwargs = {"region_name": settings.s3_region}
+        if settings.s3_endpoint_url:
+            client_kwargs["endpoint_url"] = settings.s3_endpoint_url
+        client = boto3.client("s3", **client_kwargs)
+        return client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": settings.s3_bucket, "Key": storage_key},
+            ExpiresIn=expires_in_seconds,
+        )
+
+    target_path = storage_root() / storage_key
+    if not target_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Report file is not available for download.",
+        )
+    return f"local://{storage_key}"
+
+
 def delete_stored_file(storage_key: str) -> bool:
     if not storage_key:
         return False

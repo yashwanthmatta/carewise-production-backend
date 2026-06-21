@@ -82,6 +82,7 @@ def test_privacy_export_delete_request_and_delete_flow():
         assert export_payload["account"]["email"] == email
         assert len(export_payload["patients"]) == 1
         assert len(export_payload["reports"]) == 1
+        assert "storage_url" not in export_payload["reports"][0]
 
         delete_request = client.post(
             "/privacy/me/delete-request",

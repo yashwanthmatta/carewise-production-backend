@@ -9,11 +9,17 @@ from app.core.rbac import Role, require_roles
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.models.carewise import ReportAnalysis, ReportUpload
-from app.schemas.carewise import ReportAnalysisOut, ReportTextUpdateIn, ReportUploadIn, ReportUploadOut
+from app.schemas.carewise import (
+    ReportAnalysisOut,
+    ReportDownloadOut,
+    ReportTextUpdateIn,
+    ReportUploadIn,
+    ReportUploadOut,
+)
 from app.services.access_control import assert_patient_access
 from app.services.audit import write_audit
 from app.services.safety import emergency_flags, matched_conditions, requires_clinician_review
-from app.services.storage import safe_file_name, store_report_file
+from app.services.storage import create_download_url, safe_file_name, store_report_file
 
 router = APIRouter()
 
@@ -90,6 +96,35 @@ def list_reports(
         select(ReportUpload).where(ReportUpload.patient_id == patient_id).order_by(ReportUpload.created_at.desc()).limit(50)
     ).all()
     return [report_out(report) for report in reports]
+
+
+@router.get("/{report_id}/download", response_model=ReportDownloadOut)
+def get_report_download_url(
+    report_id: str,
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    report = db.get(ReportUpload, report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    assert_patient_access(db, user, report.patient_id)
+    download_url = create_download_url(report.storage_key)
+    write_audit(
+        db,
+        user.user_id,
+        report.patient_id,
+        "report_download_url_created",
+        "report",
+        report.id,
+        {"file_name": report.file_name},
+    )
+    db.commit()
+    return ReportDownloadOut(
+        report_id=report.id,
+        file_name=report.file_name,
+        download_url=download_url,
+        expires_in_seconds=900,
+    )
 
 
 @router.put("/{report_id}/text", response_model=ReportUploadOut)

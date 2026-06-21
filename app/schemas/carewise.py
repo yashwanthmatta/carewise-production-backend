@@ -130,6 +130,13 @@ class ReportTextUpdateIn(BaseModel):
     report_text: str = Field(min_length=1, max_length=12000)
 
 
+class ReportDownloadOut(BaseModel):
+    report_id: str
+    file_name: str
+    download_url: str
+    expires_in_seconds: int
+
+
 class ReportAnalysisOut(BaseModel):
     id: str
     report_id: str

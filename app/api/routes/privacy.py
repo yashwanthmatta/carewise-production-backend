@@ -77,7 +77,6 @@ def export_my_data(
                 "patient_id": report.patient_id,
                 "file_name": report.file_name,
                 "content_type": report.content_type,
-                "storage_url": report.storage_url,
                 "file_size_bytes": int(report.file_size_bytes or 0),
                 "status": report.status,
             }

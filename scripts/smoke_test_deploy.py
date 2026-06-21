@@ -55,6 +55,11 @@ def main() -> int:
     parser.add_argument("--base-url", required=True, help="Example: https://carewise-api.onrender.com")
     parser.add_argument("--email", default="")
     parser.add_argument("--password", default="change-me-long-password")
+    parser.add_argument(
+        "--keep-data",
+        action="store_true",
+        help="Keep the smoke-test account and reports for manual debugging.",
+    )
     args = parser.parse_args()
 
     base_url = args.base_url.rstrip("/")
@@ -159,6 +164,12 @@ def main() -> int:
             {"channel": "push", "device_token": "smoke-device-token", "enabled": True},
             token,
         )
+        export = request_json("GET", f"{base_url}/privacy/me/export", token=token)
+        if export["account"]["email"] != email or not export["patients"] or not export["reports"]:
+            raise RuntimeError("Privacy export did not include the smoke-test account, patient, and reports.")
+        deletion = {"status": "skipped"}
+        if not args.keep_data:
+            deletion = request_json("DELETE", f"{base_url}/privacy/me", token=token)
     except urllib.error.HTTPError as exc:
         print(exc.read().decode("utf-8"), file=sys.stderr)
         return 1
@@ -194,6 +205,8 @@ def main() -> int:
                 "insurance_matches": len(insurance["matches"]),
                 "subscription_id": subscription["id"],
                 "notification_id": notification["id"],
+                "privacy_export_reports": len(export["reports"]),
+                "cleanup": deletion["status"],
             },
             indent=2,
         )

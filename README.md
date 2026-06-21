@@ -78,7 +78,10 @@ python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL
 The smoke test verifies `/health`, `/features`, `/ready`, auth, consent,
 profile sync, text report analysis, saved analysis history, multipart file
 upload, protected report download URL creation, recommendations, doctor search,
-insurance matching, subscription checkout, and notification registration.
+insurance matching, subscription checkout, notification registration, privacy
+export, and smoke-account cleanup. Use `--keep-data` only when debugging a
+failed deploy because it leaves the smoke-test account and reports in the
+target environment.
 
 ## Main Commands
 

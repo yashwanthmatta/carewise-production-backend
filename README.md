@@ -76,9 +76,9 @@ python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL
 ```
 
 The smoke test verifies `/health`, `/features`, `/ready`, auth, consent,
-profile sync, text report analysis, multipart file upload, protected report
-download URL creation, recommendations, doctor search, insurance matching,
-subscription checkout, and notification registration.
+profile sync, text report analysis, saved analysis history, multipart file
+upload, protected report download URL creation, recommendations, doctor search,
+insurance matching, subscription checkout, and notification registration.
 
 ## Main Commands
 

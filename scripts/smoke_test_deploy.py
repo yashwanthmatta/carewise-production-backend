@@ -114,6 +114,9 @@ def main() -> int:
             token,
         )
         analysis = request_json("POST", f"{base_url}/reports/{report['id']}/analyze", token=token)
+        analyses = request_json("GET", f"{base_url}/reports/{report['id']}/analyses", token=token)
+        if not analyses or analyses[0]["id"] != analysis["id"]:
+            raise RuntimeError("Saved report analysis history did not return the latest analysis.")
         file_report = request_multipart(
             f"{base_url}/reports/upload-file",
             fields={
@@ -183,6 +186,7 @@ def main() -> int:
                 "risk_level": care_plan["risk_level"],
                 "report_id": report["id"],
                 "analysis_id": analysis["id"],
+                "saved_analyses": len(analyses),
                 "file_report_id": file_report["id"],
                 "download_url_kind": "private" if download["download_url"].startswith(("http://", "https://")) else "local",
                 "recommendation_items": len(recommendation["diet"]),

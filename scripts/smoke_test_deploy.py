@@ -175,6 +175,20 @@ def main() -> int:
             {"channel": "push", "device_token": "smoke-device-token", "enabled": True},
             token,
         )
+        export_summary = request_json("GET", f"{base_url}/privacy/me/export-summary", token=token)
+        required_summary_counts = {
+            "patients": 1,
+            "reports": 1,
+            "report_analyses": 1,
+            "medications": 1,
+            "intakes": 1,
+            "care_plans": 1,
+        }
+        for key, minimum in required_summary_counts.items():
+            if export_summary["counts"].get(key, 0) < minimum:
+                raise RuntimeError(f"Privacy export summary did not include expected {key} count.")
+        if export_summary.get("includes_private_storage_urls") is not False:
+            raise RuntimeError("Privacy export summary must not include private storage URLs.")
         export = request_json("GET", f"{base_url}/privacy/me/export", token=token)
         if (
             export["account"]["email"] != email
@@ -225,6 +239,7 @@ def main() -> int:
                 "insurance_matches": len(insurance["matches"]),
                 "subscription_id": subscription["id"],
                 "notification_id": notification["id"],
+                "privacy_summary_counts": export_summary["counts"],
                 "privacy_export_reports": len(export["reports"]),
                 "privacy_export_analyses": len(export["report_analyses"]),
                 "privacy_export_medications": len(export["medications"]),

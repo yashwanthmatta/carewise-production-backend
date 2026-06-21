@@ -32,6 +32,22 @@ from app.services.storage import delete_stored_file
 router = APIRouter()
 
 
+@router.get("/me/export-summary")
+def export_my_data_summary(
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    profiles = db.scalars(select(PatientProfile).where(PatientProfile.user_id == user.user_id)).all()
+    patient_ids = [profile.id for profile in profiles]
+    counts = build_privacy_export_counts(db, user.user_id, patient_ids)
+    return {
+        "account": {"id": user.user_id, "email": user.email, "role": user.role},
+        "counts": counts,
+        "includes_private_storage_urls": False,
+        "message": "Summary only. Run the full export to download readable account and care data.",
+    }
+
+
 @router.get("/me/export")
 def export_my_data(
     user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
@@ -226,6 +242,39 @@ def delete_my_account_data(
     db.add(deletion_request)
     db.commit()
     return {"status": "deleted", "deletion_request_id": deletion_request.id}
+
+
+def build_privacy_export_counts(db: Session, user_id: str, patient_ids: list[str]) -> dict[str, int]:
+    reports = db.scalars(select(ReportUpload).where(ReportUpload.patient_id.in_(patient_ids))).all() if patient_ids else []
+    report_ids = [report.id for report in reports]
+    return {
+        "patients": len(patient_ids),
+        "consent_records": len(db.scalars(select(ConsentRecord).where(ConsentRecord.user_id == user_id)).all()),
+        "reports": len(reports),
+        "report_analyses": (
+            len(db.scalars(select(ReportAnalysis).where(ReportAnalysis.report_id.in_(report_ids))).all())
+            if report_ids
+            else 0
+        ),
+        "medications": (
+            len(db.scalars(select(Medication).where(Medication.patient_id.in_(patient_ids))).all())
+            if patient_ids
+            else 0
+        ),
+        "intakes": (
+            len(db.scalars(select(Intake).where(Intake.patient_id.in_(patient_ids))).all())
+            if patient_ids
+            else 0
+        ),
+        "care_plans": (
+            len(db.scalars(select(CarePlan).where(CarePlan.patient_id.in_(patient_ids))).all())
+            if patient_ids
+            else 0
+        ),
+        "subscriptions": len(db.scalars(select(Subscription).where(Subscription.user_id == user_id)).all()),
+        "notifications": len(db.scalars(select(NotificationPreference).where(NotificationPreference.user_id == user_id)).all()),
+        "audit_events": len(db.scalars(select(AuditEvent).where(AuditEvent.actor_id == user_id).limit(100)).all()),
+    }
 
 
 def safe_json_loads(value: str) -> dict | list:

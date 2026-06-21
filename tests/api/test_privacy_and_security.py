@@ -99,6 +99,19 @@ def test_privacy_export_delete_request_and_delete_flow():
         )
         assert care_plan.status_code == 200
 
+        summary = client.get("/privacy/me/export-summary", headers=headers)
+        assert summary.status_code == 200
+        summary_payload = summary.json()
+        assert summary_payload["account"]["email"] == email
+        assert summary_payload["counts"]["patients"] == 1
+        assert summary_payload["counts"]["reports"] == 1
+        assert summary_payload["counts"]["report_analyses"] == 1
+        assert summary_payload["counts"]["medications"] == 1
+        assert summary_payload["counts"]["intakes"] == 1
+        assert summary_payload["counts"]["care_plans"] == 1
+        assert summary_payload["includes_private_storage_urls"] is False
+        assert "patients" not in summary_payload
+
         export = client.get("/privacy/me/export", headers=headers)
         assert export.status_code == 200
         export_payload = export.json()

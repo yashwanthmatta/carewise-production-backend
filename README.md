@@ -215,6 +215,11 @@ Setup guides:
 
 ## Privacy Endpoints
 
+- `GET /privacy/me/export-summary` returns safe account metadata plus counts for
+  patients, consents, reports, analyses, medications, intakes, care plans,
+  subscriptions, notifications, and audit events. Use this in the app when you
+  only need to show what data exists; it does not return readable health records
+  or private storage URLs.
 - `GET /privacy/me/export` returns the signed-in user's account, patient, consent,
   report metadata, saved report analyses, medications, intakes, care plans,
   subscriptions, notifications, and audit metadata. It does not expose private

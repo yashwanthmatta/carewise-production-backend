@@ -63,7 +63,7 @@ REQUIRED_STRINGS = {
     "app/db/migrate.py": ["command.stamp", "command.upgrade", "alembic_version", "settings.sqlalchemy_database_url"],
     "migrations/versions/0001_initial_schema.py": ["create_table", "users", "patient_profiles", "care_plans"],
     "migrations/versions/0002_product_systems.py": ["report_uploads", "report_analyses", "subscriptions", "notification_preferences"],
-    "app/api/routes/reports.py": ["/upload", "/download", "analyze_report", "report_uploaded"],
+    "app/api/routes/reports.py": ["/upload", "/download", "/analyses", "analyze_report", "report_uploaded"],
     "app/api/routes/recommendations.py": ["RecommendationOut", "safety_notes"],
     "app/api/routes/doctors.py": ["search_doctors", "DoctorSearchOut"],
     "app/api/routes/insurance.py": ["match_insurance", "InsuranceMatchOut"],

@@ -143,6 +143,7 @@ The backend now supports:
 - JSON report uploads for pasted/OCR text at `POST /reports/upload`
 - Multipart file uploads at `POST /reports/upload-file`
 - Protected file access through `GET /reports/{report_id}/download`
+- Saved report explanation history through `GET /reports/{report_id}/analyses`
 - Content-type allow-listing
 - File-size limits through `CAREWISE_MAX_REPORT_FILE_BYTES`
 - Local object-store style paths under `CAREWISE_LOCAL_STORAGE_DIR`

@@ -94,6 +94,40 @@ def test_report_download_url_requires_patient_access():
         assert blocked.status_code == 403
 
 
+def test_report_analysis_history_requires_patient_access():
+    app = create_app()
+    with TestClient(app) as client:
+        owner_headers, _ = auth_headers(client)
+        other_headers, _ = auth_headers(client)
+        owner_patient_id = create_profile(client, owner_headers, "Owner Patient")
+        create_profile(client, other_headers, "Other Patient")
+
+        upload = client.post(
+            "/reports/upload",
+            json={
+                "patient_id": owner_patient_id,
+                "file_name": "owner-report.txt",
+                "content_type": "text/plain",
+                "report_text": "LDL cholesterol elevated. A1C normal. No chest pain.",
+            },
+            headers=owner_headers,
+        )
+        assert upload.status_code == 200
+
+        analysis = client.post(f"/reports/{upload.json()['id']}/analyze", headers=owner_headers)
+        assert analysis.status_code == 200
+
+        history = client.get(f"/reports/{upload.json()['id']}/analyses", headers=owner_headers)
+        assert history.status_code == 200
+        history_payload = history.json()
+        assert len(history_payload) == 1
+        assert history_payload[0]["id"] == analysis.json()["id"]
+        assert history_payload[0]["summary"]["message"].endswith("This is not a diagnosis.")
+
+        blocked = client.get(f"/reports/{upload.json()['id']}/analyses", headers=other_headers)
+        assert blocked.status_code == 403
+
+
 def test_text_file_upload_is_extracted_for_analysis_when_form_text_is_empty():
     app = create_app()
     with TestClient(app) as client:

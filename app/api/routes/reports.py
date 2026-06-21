@@ -127,6 +127,25 @@ def get_report_download_url(
     )
 
 
+@router.get("/{report_id}/analyses", response_model=list[ReportAnalysisOut])
+def list_report_analyses(
+    report_id: str,
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.CLINICIAN, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    report = db.get(ReportUpload, report_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    assert_patient_access(db, user, report.patient_id)
+    analyses = db.scalars(
+        select(ReportAnalysis)
+        .where(ReportAnalysis.report_id == report.id)
+        .order_by(ReportAnalysis.created_at.desc())
+        .limit(20)
+    ).all()
+    return [analysis_out(analysis) for analysis in analyses]
+
+
 @router.put("/{report_id}/text", response_model=ReportUploadOut)
 def update_report_text(
     report_id: str,
@@ -251,6 +270,18 @@ def analyze_report(
         status=analysis.status,
         summary=summary,
         recommendations=recommendations,
+    )
+
+
+def analysis_out(analysis: ReportAnalysis) -> ReportAnalysisOut:
+    return ReportAnalysisOut(
+        id=analysis.id,
+        report_id=analysis.report_id,
+        patient_id=analysis.patient_id,
+        risk_level=analysis.risk_level,
+        status=analysis.status,
+        summary=json.loads(analysis.summary_json or "{}"),
+        recommendations=json.loads(analysis.recommendations_json or "{}"),
     )
 
 

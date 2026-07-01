@@ -10,6 +10,7 @@ from app.api.routes import (
     doctors,
     health,
     insurance,
+    lab_trends,
     mvp,
     notifications,
     patients,
@@ -53,6 +54,7 @@ def create_app() -> FastAPI:
     app.include_router(care_plans.router, prefix="/care-plans", tags=["care-plans"])
     app.include_router(clinical_review.router, prefix="/clinical-review", tags=["clinical-review"])
     app.include_router(reports.router, prefix="/reports", tags=["reports"])
+    app.include_router(lab_trends.router, prefix="/lab-trends", tags=["lab-trends"])
     app.include_router(recommendations.router, prefix="/recommendations", tags=["recommendations"])
     app.include_router(doctors.router, prefix="/doctors", tags=["doctors"])
     app.include_router(insurance.router, prefix="/insurance", tags=["insurance"])

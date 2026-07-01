@@ -15,6 +15,7 @@ from app.models.carewise import (
     DataDeletionRequest,
     EmailVerificationToken,
     Intake,
+    LabTrend,
     Medication,
     NotificationPreference,
     PatientProfile,
@@ -67,6 +68,7 @@ def export_my_data(
     medications = db.scalars(select(Medication).where(Medication.patient_id.in_(patient_ids))).all() if patient_ids else []
     intakes = db.scalars(select(Intake).where(Intake.patient_id.in_(patient_ids))).all() if patient_ids else []
     care_plans = db.scalars(select(CarePlan).where(CarePlan.patient_id.in_(patient_ids))).all() if patient_ids else []
+    lab_trends = db.scalars(select(LabTrend).where(LabTrend.patient_id.in_(patient_ids))).all() if patient_ids else []
     audit_events = db.scalars(select(AuditEvent).where(AuditEvent.actor_id == user.user_id).limit(100)).all()
 
     return {
@@ -161,6 +163,22 @@ def export_my_data(
             }
             for plan in care_plans
         ],
+        "lab_trends": [
+            {
+                "id": trend.id,
+                "patient_id": trend.patient_id,
+                "report_id": trend.report_id,
+                "test_name": trend.test_name,
+                "value": trend.value,
+                "unit": trend.unit,
+                "observed_on": trend.observed_on,
+                "flag": trend.flag,
+                "notes": decrypt_field(trend.encrypted_notes),
+                "source": trend.source,
+                "created_at": trend.created_at,
+            }
+            for trend in lab_trends
+        ],
         "subscriptions": [
             {"id": item.id, "plan_code": item.plan_code, "status": item.status, "payment_provider": item.payment_provider}
             for item in subscriptions
@@ -219,6 +237,7 @@ def delete_my_account_data(
                 pass
         if report_ids:
             db.execute(delete(ReportAnalysis).where(ReportAnalysis.report_id.in_(report_ids)))
+        db.execute(delete(LabTrend).where(LabTrend.patient_id.in_(patient_ids)))
         db.execute(delete(ReportUpload).where(ReportUpload.patient_id.in_(patient_ids)))
         db.execute(delete(CarePlan).where(CarePlan.patient_id.in_(patient_ids)))
         db.execute(delete(Intake).where(Intake.patient_id.in_(patient_ids)))
@@ -268,6 +287,11 @@ def build_privacy_export_counts(db: Session, user_id: str, patient_ids: list[str
         ),
         "care_plans": (
             len(db.scalars(select(CarePlan).where(CarePlan.patient_id.in_(patient_ids))).all())
+            if patient_ids
+            else 0
+        ),
+        "lab_trends": (
+            len(db.scalars(select(LabTrend).where(LabTrend.patient_id.in_(patient_ids))).all())
             if patient_ids
             else 0
         ),

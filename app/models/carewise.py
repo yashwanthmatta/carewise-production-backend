@@ -185,6 +185,22 @@ class ReportAnalysis(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class LabTrend(Base):
+    __tablename__ = "lab_trends"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("lab"))
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    report_id: Mapped[str | None] = mapped_column(ForeignKey("report_uploads.id"), index=True, nullable=True)
+    test_name: Mapped[str] = mapped_column(String(160), index=True)
+    value: Mapped[str] = mapped_column(String(80), default="")
+    unit: Mapped[str] = mapped_column(String(80), default="")
+    observed_on: Mapped[str] = mapped_column(String(40), index=True, default="")
+    flag: Mapped[str] = mapped_column(String(80), index=True, default="not_sure")
+    encrypted_notes: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(80), index=True, default="manual")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
@@ -226,6 +242,8 @@ Index("idx_consent_user_created", ConsentRecord.user_id, ConsentRecord.created_a
 Index("idx_consent_region_created", ConsentRecord.region, ConsentRecord.created_at.desc())
 Index("idx_reports_patient_created", ReportUpload.patient_id, ReportUpload.created_at.desc())
 Index("idx_analyses_patient_created", ReportAnalysis.patient_id, ReportAnalysis.created_at.desc())
+Index("idx_lab_trends_patient_observed", LabTrend.patient_id, LabTrend.observed_on.desc())
+Index("idx_lab_trends_patient_test", LabTrend.patient_id, LabTrend.test_name)
 Index("idx_deletion_requests_user_created", DataDeletionRequest.user_id, DataDeletionRequest.created_at.desc())
 Index("idx_password_reset_user_created", PasswordResetToken.user_id, PasswordResetToken.created_at.desc())
 Index("idx_refresh_tokens_user_created", RefreshToken.user_id, RefreshToken.created_at.desc())

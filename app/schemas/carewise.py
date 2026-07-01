@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -145,6 +147,32 @@ class ReportAnalysisOut(BaseModel):
     status: str
     summary: dict
     recommendations: dict
+
+
+class LabTrendIn(BaseModel):
+    patient_id: str
+    report_id: str | None = None
+    test_name: str = Field(min_length=1, max_length=160)
+    value: str = Field(min_length=1, max_length=80)
+    unit: str = Field(default="", max_length=80)
+    observed_on: str = Field(default="", max_length=40)
+    flag: str = Field(default="not_sure", max_length=80)
+    notes: str = Field(default="", max_length=2000)
+    source: str = Field(default="manual", max_length=80)
+
+
+class LabTrendOut(BaseModel):
+    id: str
+    patient_id: str
+    report_id: str | None = None
+    test_name: str
+    value: str
+    unit: str
+    observed_on: str
+    flag: str
+    notes: str
+    source: str
+    created_at: datetime
 
 
 class AnalyzeReportRequest(BaseModel):

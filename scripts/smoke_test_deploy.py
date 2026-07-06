@@ -133,6 +133,29 @@ def main() -> int:
         analyses = request_json("GET", f"{base_url}/reports/{report['id']}/analyses", token=token)
         if not analyses or analyses[0]["id"] != analysis["id"]:
             raise RuntimeError("Saved report analysis history did not return the latest analysis.")
+        lab_trend = request_json(
+            "POST",
+            f"{base_url}/lab-trends",
+            {
+                "patient_id": profile["patient_id"],
+                "report_id": report["id"],
+                "test_name": "LDL cholesterol",
+                "value": "142",
+                "unit": "mg/dL",
+                "observed_on": "2026-07-06",
+                "flag": "high",
+                "notes": "Deployment smoke test value. Verify against original reports in real use.",
+                "source": "deploy_smoke",
+            },
+            token,
+        )
+        lab_trends = request_json(
+            "GET",
+            f"{base_url}/lab-trends?patient_id={urllib.parse.quote(profile['patient_id'])}",
+            token=token,
+        )
+        if not lab_trends or lab_trends[0]["id"] != lab_trend["id"]:
+            raise RuntimeError("Saved lab trend history did not return the latest lab trend.")
         file_report = request_multipart(
             f"{base_url}/reports/upload-file",
             fields={
@@ -183,6 +206,7 @@ def main() -> int:
             "medications": 1,
             "intakes": 1,
             "care_plans": 1,
+            "lab_trends": 1,
         }
         for key, minimum in required_summary_counts.items():
             if export_summary["counts"].get(key, 0) < minimum:
@@ -198,8 +222,9 @@ def main() -> int:
             or not export["medications"]
             or not export["intakes"]
             or not export["care_plans"]
+            or not export["lab_trends"]
         ):
-            raise RuntimeError("Privacy export did not include the smoke-test account, patient, reports, analyses, medications, intakes, and care plans.")
+            raise RuntimeError("Privacy export did not include the smoke-test account, patient, reports, analyses, medications, intakes, care plans, and lab trends.")
         deletion = {"status": "skipped"}
         if not args.keep_data:
             deletion = request_json("DELETE", f"{base_url}/privacy/me", token=token)
@@ -232,6 +257,8 @@ def main() -> int:
                 "report_id": report["id"],
                 "analysis_id": analysis["id"],
                 "saved_analyses": len(analyses),
+                "lab_trend_id": lab_trend["id"],
+                "saved_lab_trends": len(lab_trends),
                 "file_report_id": file_report["id"],
                 "download_url_kind": "private" if download["download_url"].startswith(("http://", "https://")) else "local",
                 "recommendation_items": len(recommendation["diet"]),
@@ -245,6 +272,7 @@ def main() -> int:
                 "privacy_export_medications": len(export["medications"]),
                 "privacy_export_intakes": len(export["intakes"]),
                 "privacy_export_care_plans": len(export["care_plans"]),
+                "privacy_export_lab_trends": len(export["lab_trends"]),
                 "cleanup": deletion["status"],
             },
             indent=2,

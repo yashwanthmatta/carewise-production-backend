@@ -63,6 +63,12 @@ Check file storage configuration:
 python3 scripts/check_storage.py
 ```
 
+Generate the backend launch package:
+
+```bash
+python3 scripts/generate_backend_launch_package.py
+```
+
 Generate production secrets:
 
 ```bash
@@ -212,6 +218,7 @@ Setup guides:
 
 - `deploy/storage/cloudflare-r2.md`
 - `deploy/storage/aws-s3.md`
+- `deploy/backend_launch_package.md`
 
 ## Privacy Endpoints
 

@@ -43,6 +43,7 @@ def main() -> None:
     storage_script_exists = (ROOT / "scripts" / "check_storage.py").exists()
     smoke_script_exists = (ROOT / "scripts" / "smoke_test_deploy.py").exists()
     render_runbook_exists = (ROOT / "deploy" / "render_env_runbook.md").exists()
+    governance_runbook_exists = (ROOT / "security" / "data_governance_runbook.md").exists()
     dockerfile = read_text("Dockerfile")
 
     checks = [
@@ -60,6 +61,7 @@ def main() -> None:
         checkbox(storage_script_exists, "Storage configuration check script exists"),
         checkbox(smoke_script_exists, "Deployment smoke-test script exists"),
         checkbox(render_runbook_exists, "Render environment runbook exists"),
+        checkbox(governance_runbook_exists, "Data governance runbook exists"),
         checkbox(static_ok, "Static backend readiness check passes"),
         checkbox("not cleared for real patient use" in readme.lower(), "README keeps healthcare launch warning"),
     ]
@@ -96,6 +98,7 @@ Run these before trusting a deployment:
 ```bash
 python3 tests/static_readiness_check.py
 python3 scripts/generate_render_env_runbook.py
+python3 scripts/generate_data_governance_runbook.py
 python3 scripts/check_storage.py
 python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL
 ```
@@ -114,6 +117,7 @@ Expected deployed health:
 - [ ] Render environment variables match `deploy/render_env_runbook.md`.
 - [ ] Render/R2/S3 storage is private and file URLs are not publicly exposed.
 - [ ] OpenAI, storage, and payment processors are documented in privacy forms.
+- [ ] Backup, retention, and deletion policies match `security/data_governance_runbook.md`.
 - [ ] Backups, retention, deletion, and audit-log policies are approved before real patient use.
 - [ ] Load tests are run before marketing traffic or investor demos with live users.
 

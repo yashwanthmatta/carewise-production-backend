@@ -67,6 +67,7 @@ Generate the backend launch package:
 
 ```bash
 python3 scripts/generate_render_env_runbook.py
+python3 scripts/generate_data_governance_runbook.py
 python3 scripts/generate_backend_launch_package.py
 ```
 
@@ -221,6 +222,7 @@ Setup guides:
 - `deploy/storage/aws-s3.md`
 - `deploy/render_env_runbook.md`
 - `deploy/backend_launch_package.md`
+- `security/data_governance_runbook.md`
 
 ## Privacy Endpoints
 

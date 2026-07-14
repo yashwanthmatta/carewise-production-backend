@@ -44,6 +44,8 @@ def main() -> None:
     smoke_script_exists = (ROOT / "scripts" / "smoke_test_deploy.py").exists()
     render_runbook_exists = (ROOT / "deploy" / "render_env_runbook.md").exists()
     governance_runbook_exists = (ROOT / "security" / "data_governance_runbook.md").exists()
+    publish_gate_exists = (ROOT / "scripts" / "backend_publish_gate.py").exists()
+    publish_gate_report_exists = (ROOT / "deploy" / "backend_publish_readiness_gate.md").exists()
     dockerfile = read_text("Dockerfile")
 
     checks = [
@@ -62,6 +64,8 @@ def main() -> None:
         checkbox(smoke_script_exists, "Deployment smoke-test script exists"),
         checkbox(render_runbook_exists, "Render environment runbook exists"),
         checkbox(governance_runbook_exists, "Data governance runbook exists"),
+        checkbox(publish_gate_exists, "Backend publish readiness gate script exists"),
+        checkbox(publish_gate_report_exists, "Backend publish readiness gate report exists"),
         checkbox(static_ok, "Static backend readiness check passes"),
         checkbox("not cleared for real patient use" in readme.lower(), "README keeps healthcare launch warning"),
     ]
@@ -100,6 +104,7 @@ python3 tests/static_readiness_check.py
 python3 scripts/generate_render_env_runbook.py
 python3 scripts/generate_data_governance_runbook.py
 python3 scripts/check_storage.py
+python3 scripts/backend_publish_gate.py --base-url https://YOUR-API-URL
 python3 scripts/smoke_test_deploy.py --base-url https://YOUR-API-URL
 ```
 
@@ -109,6 +114,7 @@ Expected deployed health:
 - `/ready` returns ready after database and storage are configured.
 - `/features` shows durable storage ready before real report uploads.
 - Smoke test uses only synthetic data and cleans up the smoke account.
+- Backend publish gate blocks real patient data until the deployed smoke test passes.
 
 ## Manual Healthcare Blockers
 

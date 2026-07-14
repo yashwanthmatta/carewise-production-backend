@@ -68,6 +68,7 @@ Generate the backend launch package:
 ```bash
 python3 scripts/generate_render_env_runbook.py
 python3 scripts/generate_data_governance_runbook.py
+python3 scripts/backend_publish_gate.py --base-url https://YOUR-API-URL
 python3 scripts/generate_backend_launch_package.py
 ```
 

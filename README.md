@@ -66,6 +66,7 @@ python3 scripts/check_storage.py
 Generate the backend launch package:
 
 ```bash
+python3 scripts/generate_render_env_runbook.py
 python3 scripts/generate_backend_launch_package.py
 ```
 
@@ -218,6 +219,7 @@ Setup guides:
 
 - `deploy/storage/cloudflare-r2.md`
 - `deploy/storage/aws-s3.md`
+- `deploy/render_env_runbook.md`
 - `deploy/backend_launch_package.md`
 
 ## Privacy Endpoints

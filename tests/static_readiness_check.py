@@ -49,8 +49,10 @@ REQUIRED_FILES = [
     "migrations/versions/0002_product_systems.py",
     "scripts/generate_secrets.py",
     "scripts/generate_backend_launch_package.py",
+    "scripts/generate_render_env_runbook.py",
     "scripts/smoke_test_deploy.py",
     "deploy/backend_launch_package.md",
+    "deploy/render_env_runbook.md",
     "tests/api/test_auth_consent_careplan.py",
 ]
 
@@ -84,8 +86,10 @@ REQUIRED_STRINGS = {
     "deploy/gcp/cloud-run-service.yaml": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY"],
     "scripts/generate_secrets.py": ["CAREWISE_JWT_SECRET", "CAREWISE_FIELD_ENCRYPTION_KEY"],
     "scripts/generate_backend_launch_package.py": ["Backend Launch Package", "CAREWISE_S3_BUCKET", "smoke_test_deploy.py", "Do not store health data in logs"],
+    "scripts/generate_render_env_runbook.py": ["Render Environment Runbook", "CAREWISE_STORAGE_BACKEND", "Post-Deploy Verification", "Do not put OpenAI keys"],
     "scripts/smoke_test_deploy.py": ["/ready", "/features", "request_multipart", "/reports/upload-file", "/analyses", "/download", "/lab-trends", "saved_lab_trends", "/insurance/match", "/privacy/me/export-summary", "privacy_summary_counts", "/privacy/me/export", "privacy_export_analyses", "privacy_export_medications", "privacy_export_intakes", "privacy_export_care_plans", "privacy_export_lab_trends", "/privacy/me"],
     "deploy/backend_launch_package.md": ["Required Production Secrets", "Deploy Verification Commands", "Manual Healthcare Blockers", "not describe CareWise as a diagnosis"],
+    "deploy/render_env_runbook.md": ["Required Before Production Deploy", "Post-Deploy Verification", "Do not put OpenAI keys", "durable_storage"],
     ".gitignore": [".env", ".venv", "*.sqlite"],
     "GITHUB_UPLOAD_STEPS.md": ["git init", "git push", "carewise-production-backend"],
     "tests/api/test_auth_consent_careplan.py": ["TestClient", "/auth/signup", "/consent", "/care-plans/generate"],

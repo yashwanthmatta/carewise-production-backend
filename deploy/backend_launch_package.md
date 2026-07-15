@@ -59,6 +59,13 @@ Expected deployed health:
 - Smoke test uses only synthetic data and cleans up the smoke account.
 - Backend publish gate blocks real patient data until the deployed smoke test passes.
 
+## Latest Production Evidence
+
+- 2026-07-15: `https://carewise-api.onrender.com/health` returned healthy status.
+- 2026-07-15: `https://carewise-api.onrender.com/ready` returned ready with database, configuration, and storage checks passing.
+- 2026-07-15: `python3 scripts/smoke_test_deploy.py --base-url https://carewise-api.onrender.com` passed end to end with synthetic data and deleted the smoke-test account.
+- Feature flags at verification time: durable report storage ready, report uploads ready, image OCR off, Stripe checkout off, email delivery off.
+
 ## Manual Healthcare Blockers
 
 - [ ] Legal/privacy review approves Privacy Policy, Terms, Disclaimer, and Data Deletion flows.

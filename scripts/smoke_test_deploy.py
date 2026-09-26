@@ -50,6 +50,18 @@ def request_multipart(url: str, fields: dict[str, str], file_field: str, file_na
         return json.loads(response.read().decode("utf-8"))
 
 
+def wait_for_health(base_url: str, wait_seconds: int) -> dict:
+    # Free-tier hosts sleep when idle; the first request can take a minute to wake them.
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        try:
+            return request_json("GET", f"{base_url}/health")
+        except (urllib.error.URLError, TimeoutError, ConnectionError):
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(5)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Smoke-test a deployed CareWise API.")
     parser.add_argument("--base-url", required=True, help="Example: https://carewise-api.onrender.com")
@@ -60,13 +72,19 @@ def main() -> int:
         action="store_true",
         help="Keep the smoke-test account and reports for manual debugging.",
     )
+    parser.add_argument(
+        "--wake-seconds",
+        type=int,
+        default=120,
+        help="How long to keep retrying /health while a sleeping host wakes up.",
+    )
     args = parser.parse_args()
 
     base_url = args.base_url.rstrip("/")
     email = args.email or f"smoke-{int(time.time())}@example.com"
 
     try:
-        health = request_json("GET", f"{base_url}/health")
+        health = wait_for_health(base_url, args.wake_seconds)
         features = request_json("GET", f"{base_url}/features")
         ready = request_json("GET", f"{base_url}/ready")
         signup = request_json(

@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CAREWISE_ENV: test
-      CAREWISE_DATABASE_URL: sqlite:///:memory:
+      CAREWISE_DATABASE_URL: "sqlite:///:memory:"
       CAREWISE_REDIS_URL: ""
       CAREWISE_JWT_SECRET: ci-test-secret-change-before-production
       CAREWISE_FIELD_ENCRYPTION_KEY: nSXvMikGU90uvDvpcZOKNBT9VvPHzeR9nMbCssnLydY=

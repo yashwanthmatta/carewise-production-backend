@@ -1,0 +1,16 @@
+name: Keep API Warm
+
+# Render's free plan sleeps a service after 15 idle minutes. Ping it so
+# demos do not start with a one-minute cold start.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping /health
+        run: curl --silent --show-error --fail --max-time 90 --retry 2 https://carewise-api.onrender.com/health

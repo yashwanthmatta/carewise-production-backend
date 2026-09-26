@@ -109,8 +109,14 @@ REQUIRED_STRINGS = {
 def main():
     missing_files = [path for path in REQUIRED_FILES if not (ROOT / path).exists()]
     missing_strings = {}
+    skipped_sibling_files = []
     for path, strings in REQUIRED_STRINGS.items():
-        text = (ROOT / path).read_text()
+        file_path = ROOT / path
+        if path.startswith("../") and not file_path.exists():
+            # Sibling repos are only present in the combined local workspace, not in CI.
+            skipped_sibling_files.append(path)
+            continue
+        text = file_path.read_text()
         absent = [item for item in strings if item not in text]
         if absent:
             missing_strings[path] = absent
@@ -121,6 +127,7 @@ def main():
         "required_files": len(REQUIRED_FILES),
         "missing_files": missing_files,
         "missing_strings": missing_strings,
+        "skipped_sibling_files": skipped_sibling_files,
     }
     print(json.dumps(report, indent=2))
     raise SystemExit(0 if passed else 1)

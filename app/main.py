@@ -1,4 +1,7 @@
+import logging
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
@@ -25,6 +28,11 @@ from app.services.telemetry import configure_telemetry
 from app.services.security_headers import apply_security_headers
 
 
+logger = logging.getLogger("carewise")
+
+DEGRADED_MODE_PATHS = {"/health", "/ready", "/features"}
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="CareWise API",
@@ -40,8 +48,17 @@ def create_app() -> FastAPI:
     )
     configure_telemetry(app)
 
+    app.state.startup_error = ""
+
     @app.middleware("http")
     async def security_headers_middleware(request, call_next):
+        if app.state.startup_error and request.url.path not in DEGRADED_MODE_PATHS:
+            response = JSONResponse(
+                status_code=503,
+                content={"detail": "CareWise API is not configured yet. See /ready."},
+            )
+            apply_security_headers(response)
+            return response
         response = await call_next(request)
         apply_security_headers(response)
         return response
@@ -65,7 +82,16 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def startup() -> None:
-        settings.validate_for_startup()
+        try:
+            settings.validate_for_startup()
+        except RuntimeError as error:
+            if not settings.is_production:
+                raise
+            # Stay up so /health answers and /ready explains what is missing;
+            # every other route returns 503 until the configuration is fixed.
+            app.state.startup_error = str(error)
+            logger.error("Starting in degraded mode: %s", error)
+            return
         init_local_database()
 
     return app

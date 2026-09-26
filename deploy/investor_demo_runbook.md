@@ -9,9 +9,11 @@ Use synthetic data only. Never type real patient information during a demo.
 
 ## If the live API is down
 
-`/health` does not touch the database, so if it never answers, the API
-process is not starting. The Docker command runs `python -m app.db.migrate`
-before `uvicorn`, so an unreachable database stops the whole service.
+The API now starts even when the database or a secret is missing, so
+first open https://carewise-api.onrender.com/ready. Its `issues` list says
+what is wrong (for example "Database unreachable" or the names of missing
+settings). If even `/health` never answers, the service itself is not
+running: check its Logs and that it is not suspended.
 
 1. Render dashboard → `carewise-api` → Logs. Look for a database connection
    error during `app.db.migrate`.
@@ -42,11 +44,21 @@ A new database starts empty, so create a fresh demo account afterwards.
 1. Home: explain the promise, plain-English report explanations, and point
    at the live readiness badges.
 2. Profile: log in with the prepared demo account.
-3. Upload: press "Try sample report", then "Analyze report". Walk through the
-   health score, detected values, key findings, and doctor questions.
-4. Press "Save to trends", then History: show the saved report and trends.
-5. Close on safety: CareWise is educational and not a diagnosis tool. Point
+3. Upload: type "Mom" in "Whose report is this?", press "Try sample report",
+   then "Analyze report". Walk through the health score, detected values, key
+   findings, and doctor questions. Optional: drop in a text-based lab PDF
+   (synthetic data only) to show it is read on the device.
+4. Press "Doctor brief": show the one-page summary the patient can print
+   or save as a PDF for their clinician.
+5. Switch the language picker to Español: the same explanation in Spanish.
+   Mention that translations are drafts pending clinician and medical
+   translator review.
+6. Press "Save to trends", then History: show the saved report, and filter
+   "Show reports for" by Mom to show caregiver mode.
+7. Close on safety: CareWise is educational and not a diagnosis tool. Point
    to the disclaimer and the data deletion controls.
 
-The sample-report analysis also runs in the browser, so step 3 still works
-if the API is slow; sign-in and history need the API.
+The sample-report analysis, PDF reading, doctor brief, Spanish view and
+caregiver history run in the browser, so they still work if the API is
+slow; sign-in and cloud sync need the API. On a phone, the CareWise app's
+Reports tab shows the same explanation offline ("Explain on this phone").

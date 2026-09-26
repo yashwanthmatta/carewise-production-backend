@@ -5,6 +5,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 from app.core.config import settings
+from app.db.session import engine_kwargs
 
 
 def alembic_config() -> Config:
@@ -16,7 +17,7 @@ def alembic_config() -> Config:
 
 
 def migrate_database() -> None:
-    engine = create_engine(settings.sqlalchemy_database_url, pool_pre_ping=True)
+    engine = create_engine(settings.sqlalchemy_database_url, **engine_kwargs())
     inspector = inspect(engine)
     table_names = set(inspector.get_table_names())
     has_existing_schema = "users" in table_names and "patient_profiles" in table_names

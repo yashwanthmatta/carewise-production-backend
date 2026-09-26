@@ -15,4 +15,4 @@ COPY alembic.ini ./
 
 EXPOSE 8000
 
-CMD ["sh", "-c", "python -m app.db.migrate && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "python -m app.db.migrate || echo 'CareWise: database migration failed; starting in degraded mode, see /ready'; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

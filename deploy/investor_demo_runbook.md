@@ -42,17 +42,21 @@ A new database starts empty, so create a fresh demo account afterwards.
 1. Home: explain the promise, plain-English report explanations, and point
    at the live readiness badges.
 2. Profile: log in with the prepared demo account.
-3. Upload: press "Try sample report", then "Analyze report". Walk through the
-   health score, detected values, key findings, and doctor questions.
+3. Upload: type "Mom" in "Whose report is this?", press "Try sample report",
+   then "Analyze report". Walk through the health score, detected values, key
+   findings, and doctor questions. Optional: drop in a text-based lab PDF
+   (synthetic data only) to show it is read on the device.
 4. Press "Doctor brief": show the one-page summary the patient can print
    or save as a PDF for their clinician.
 5. Switch the language picker to Español: the same explanation in Spanish.
    Mention that translations are drafts pending clinician and medical
    translator review.
-6. Press "Save to trends", then History: show the saved report and trends.
+6. Press "Save to trends", then History: show the saved report, and filter
+   "Show reports for" by Mom to show caregiver mode.
 7. Close on safety: CareWise is educational and not a diagnosis tool. Point
    to the disclaimer and the data deletion controls.
 
-The sample-report analysis, doctor brief and Spanish view run in the
-browser, so steps 3 to 5 still work if the API is slow; sign-in and history
-need the API.
+The sample-report analysis, PDF reading, doctor brief, Spanish view and
+caregiver history run in the browser, so they still work if the API is
+slow; sign-in and cloud sync need the API. On a phone, the CareWise app's
+Reports tab shows the same explanation offline ("Explain on this phone").

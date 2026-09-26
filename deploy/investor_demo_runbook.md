@@ -44,9 +44,15 @@ A new database starts empty, so create a fresh demo account afterwards.
 2. Profile: log in with the prepared demo account.
 3. Upload: press "Try sample report", then "Analyze report". Walk through the
    health score, detected values, key findings, and doctor questions.
-4. Press "Save to trends", then History: show the saved report and trends.
-5. Close on safety: CareWise is educational and not a diagnosis tool. Point
+4. Press "Doctor brief": show the one-page summary the patient can print
+   or save as a PDF for their clinician.
+5. Switch the language picker to Español: the same explanation in Spanish.
+   Mention that translations are drafts pending clinician and medical
+   translator review.
+6. Press "Save to trends", then History: show the saved report and trends.
+7. Close on safety: CareWise is educational and not a diagnosis tool. Point
    to the disclaimer and the data deletion controls.
 
-The sample-report analysis also runs in the browser, so step 3 still works
-if the API is slow; sign-in and history need the API.
+The sample-report analysis, doctor brief and Spanish view run in the
+browser, so steps 3 to 5 still work if the API is slow; sign-in and history
+need the API.

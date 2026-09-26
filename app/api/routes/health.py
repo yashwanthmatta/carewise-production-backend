@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import text
 
 from app.core.config import settings
@@ -13,7 +13,7 @@ def health():
 
 
 @router.get("/ready")
-def ready():
+def ready(request: Request):
     checks = {
         "database": database_ready(),
         "configuration": configuration_ready(),
@@ -22,7 +22,7 @@ def ready():
     if not all(checks.values()):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"status": "not_ready", "checks": checks},
+            detail={"status": "not_ready", "checks": checks, "issues": readiness_issues(request, checks)},
         )
     return {"status": "ready", "checks": checks}
 
@@ -57,6 +57,23 @@ def database_ready() -> bool:
         return True
     except Exception:
         return False
+
+
+def readiness_issues(request: Request, checks: dict) -> list[str]:
+    issues = []
+    startup_error = getattr(request.app.state, "startup_error", "")
+    if startup_error:
+        issues.append(startup_error)
+    elif not checks["configuration"]:
+        try:
+            settings.validate_for_startup()
+        except RuntimeError as error:
+            issues.append(str(error))
+    if not checks["database"]:
+        issues.append(
+            "Database unreachable. Check that CAREWISE_DATABASE_URL points to a running Postgres database."
+        )
+    return issues
 
 
 def configuration_ready() -> bool:

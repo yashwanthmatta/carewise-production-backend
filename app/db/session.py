@@ -13,7 +13,12 @@ def engine_kwargs() -> dict:
         if settings.sqlalchemy_database_url in {"sqlite://", "sqlite:///:memory:"}:
             kwargs["poolclass"] = StaticPool
         return kwargs
-    return {"pool_pre_ping": True, "pool_size": 10, "max_overflow": 20}
+    return {
+        "pool_pre_ping": True,
+        "pool_size": 10,
+        "max_overflow": 20,
+        "connect_args": {"connect_timeout": 10},
+    }
 
 
 engine = create_engine(settings.sqlalchemy_database_url, **engine_kwargs())

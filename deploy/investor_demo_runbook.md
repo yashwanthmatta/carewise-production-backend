@@ -9,9 +9,11 @@ Use synthetic data only. Never type real patient information during a demo.
 
 ## If the live API is down
 
-`/health` does not touch the database, so if it never answers, the API
-process is not starting. The Docker command runs `python -m app.db.migrate`
-before `uvicorn`, so an unreachable database stops the whole service.
+The API now starts even when the database or a secret is missing, so
+first open https://carewise-api.onrender.com/ready. Its `issues` list says
+what is wrong (for example "Database unreachable" or the names of missing
+settings). If even `/health` never answers, the service itself is not
+running: check its Logs and that it is not suspended.
 
 1. Render dashboard → `carewise-api` → Logs. Look for a database connection
    error during `app.db.migrate`.

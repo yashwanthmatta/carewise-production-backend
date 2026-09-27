@@ -29,7 +29,8 @@ health information.
 
 - [ ] Open the live site on the presenting laptop and wait for API Online,
       Database Ready, Storage Ready on the home page.
-- [ ] Log in to the demo account and run the sample report once.
+- [ ] Open https://carewise-frontend.onrender.com/#tour and click through
+      all 8 steps once, then press Esc. Leave the home page open.
 - [ ] Phone on do-not-disturb; laptop notifications off; browser zoom at
       125% so the back rows can read it.
 
@@ -40,13 +41,14 @@ health information.
 2. **Problem (40 s).** Jargon, numbers without context, short visits. One
    sourced statistic only.
 3. **Solution (30 s).** Upload, explain, score, prepare.
-4. **Live demo (2 min).** Follow `investor_demo_runbook.md` steps 3 to 6:
-   report for Mom, sample report, analysis, doctor brief, Español, history.
+4. **Live demo (2 min).** Press "See a 1-minute demo" and click Next
+   through the 8 steps (`investor_demo_runbook.md` has a line to say on
+   each). It runs in the browser, so it works even if the server is down.
 5. **Why CareWise (30 s).** The doctor brief, the patient's language,
    caregivers.
 6. **Trust and safety (20 s).** Educational, not a diagnosis; data export and
    deletion; clinician review queue.
-7. **Close (20 s).** The QR code: "Scan it, press Try sample report."
+7. **Close (20 s).** The QR code: "Scan it and press See a 1-minute demo."
 
 ## If something fails on stage
 
@@ -54,8 +56,8 @@ health information.
 | --- | --- |
 | Wi-Fi is down | Play `CareWise-backup-demo.mp4` and narrate over it. |
 | Home page shows "Waking up" | Keep talking; it switches to Online within a minute. The sample report works meanwhile. |
-| Sign-in fails | Skip it. Analysis, doctor brief, Spanish and caregiver history work without an account. |
-| The doctor brief tab is blocked | Allow pop-ups for the site, or show the brief in the backup video. |
+| Sign-in fails | Skip it. The guided demo, analysis, doctor brief, Spanish and caregiver history work without an account. |
+| The doctor brief tab is blocked | Use the guided demo: its step 5 shows the brief inside the page, no pop-up needed. |
 | A PDF will not read | Say it looks like a scanned image and use the sample report. |
 
 ## Honest answers for Q&A

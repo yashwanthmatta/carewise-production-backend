@@ -41,24 +41,32 @@ A new database starts empty, so create a fresh demo account afterwards.
 
 ## Demo path (about 5 minutes)
 
-1. Home: explain the promise, plain-English report explanations, and point
-   at the live readiness badges.
-2. Profile: log in with the prepared demo account.
-3. Upload: type "Mom" in "Whose report is this?", press "Try sample report",
-   then "Analyze report". Walk through the health score, detected values, key
-   findings, and doctor questions. Optional: drop in a text-based lab PDF
-   (synthetic data only) to show it is read on the device.
-4. Press "Doctor brief": show the one-page summary the patient can print
-   or save as a PDF for their clinician.
-5. Switch the language picker to Español: the same explanation in Spanish.
-   Mention that translations are drafts pending clinician and medical
-   translator review.
-6. Press "Save to trends", then History: show the saved report, and filter
-   "Show reports for" by Mom to show caregiver mode.
-7. Close on safety: CareWise is educational and not a diagnosis tool. Point
-   to the disclaimer and the data deletion controls.
+Open https://carewise-frontend.onrender.com/#tour, or press "See a 1-minute
+demo" on the home page. The guided demo runs entirely in the browser, so it
+works even if the API or database is down. Press Next (or the right arrow,
+or a presentation clicker); Esc exits. It follows a made-up patient, Maria,
+and saves nothing.
 
-The sample-report analysis, PDF reading, doctor brief, Spanish view and
-caregiver history run in the browser, so they still work if the API is
+1. The report: score 66/100, six key values and what to watch.
+2. Every result against her lab's own range (kidney, liver, thyroid, blood
+   count, vitamin D). Say: normal ranges differ by lab, so we use the lab's.
+3. The 4-week plan: every tip says why ("Your LDL is 148 mg/dL") and where it
+   comes from (American Heart Association, American Diabetes Association,
+   CDC). It knows penicillin and lisinopril did not suit her. Say: it never
+   names medicines or doses.
+4. Spanish, one tap (drafts pending clinician and medical translator review).
+5. The doctor brief, one printable page, including her history.
+6. Her 20-year health record: conditions, medicines, what did not suit her.
+7. A CT chest report explained: the radiologist's words, the follow-up line
+   flagged as a question for the doctor, never the images.
+8. "Now try it with your own report." Close on safety and proof:
+   educational, not a diagnosis; tested on 1,000 lab PDFs, 27,000 blood-test
+   results and 616 scan reports.
+
+If there is time after the tour, show sign-in with the demo account (only
+when the home page shows Database Ready).
+
+The guided demo, sample-report analysis, PDF reading, doctor brief, Spanish
+view and caregiver history run in the browser, so they still work if the API is
 slow; sign-in and cloud sync need the API. On a phone, the CareWise app's
 Reports tab shows the same explanation offline ("Explain on this phone").

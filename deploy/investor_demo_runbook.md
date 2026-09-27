@@ -41,22 +41,27 @@ A new database starts empty, so create a fresh demo account afterwards.
 
 ## Demo path (about 5 minutes)
 
-1. Home: explain the promise, plain-English report explanations, and point
-   at the live readiness badges.
-2. Profile: log in with the prepared demo account.
-3. Upload: type "Mom" in "Whose report is this?", press "Try sample report",
-   then "Analyze report". Walk through the health score, detected values, key
-   findings, and doctor questions. Optional: drop in a text-based lab PDF
-   (synthetic data only) to show it is read on the device.
-4. Press "Doctor brief": show the one-page summary the patient can print
-   or save as a PDF for their clinician.
-5. Switch the language picker to Español: the same explanation in Spanish.
-   Mention that translations are drafts pending clinician and medical
-   translator review.
-6. Press "Save to trends", then History: show the saved report, and filter
-   "Show reports for" by Mom to show caregiver mode.
-7. Close on safety: CareWise is educational and not a diagnosis tool. Point
-   to the disclaimer and the data deletion controls.
+1. Home: the promise in one line, and the three steps (add your report,
+   read it simply, talk to your doctor).
+2. Upload: type "Mom" in "Whose report is this?", press "Try sample report",
+   then "Analyze report". Show the health score, detected values, key
+   findings and doctor questions.
+3. Scroll to "Your plan for the next 4 weeks": every tip says why it applies
+   ("Your LDL is 148 mg/dL") and where it comes from (American Heart
+   Association, American Diabetes Association, CDC). Say: it never names
+   medicines or doses.
+4. Press "Doctor brief": the one-page summary for the clinician.
+5. Switch the language picker to Español (drafts pending clinician and
+   medical translator review).
+6. Record tab: press "Add sample 20-year history". Show "Ongoing
+   conditions", "Current medicines" and "Did not suit me", then the
+   timeline by year. Mention it goes into the doctor brief.
+7. Optional, if time: paste a full blood panel to show "All tests on your
+   report" compared with the lab's own ranges, or paste a CT report to show
+   "Your scan report explained" (the radiologist's words, never the
+   images).
+8. Close on safety and proof: educational, not a diagnosis; tested on
+   1,000 lab PDFs, 27,000 blood-test results and 616 scan reports.
 
 The sample-report analysis, PDF reading, doctor brief, Spanish view and
 caregiver history run in the browser, so they still work if the API is

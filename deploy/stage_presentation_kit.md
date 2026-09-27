@@ -82,10 +82,18 @@ Not yet certified. The reviews and vendor agreements are on the roadmap
 before launch. Do not claim compliance.
 
 **"How accurate is it?"**
-It reads six common markers today (LDL, total cholesterol, triglycerides,
-A1C, vitamin D, blood pressure) and is tested against common lab report
-formats. A
-clinician review of the wording is the next step.
+We test reading and flagging at scale: 1,000 lab report PDFs built from
+real public patient values in five lab layouts, all read correctly; 1,000
+full blood-panel PDFs (27,000 results) with no false or missed flags and
+every critical result routed to "contact your doctor today"; and 616 scan
+reports explained with no false alarms. Blood tests are compared with the
+range the lab printed. This is not clinical validation; a clinician review
+of the wording is the next step.
+
+**"Do you read MRI or CT images?"**
+No, on purpose. We explain the radiologist's written report in plain words
+and turn phrases like "biopsy is recommended" into questions for the
+doctor. Reading images is diagnosis and a regulated medical device.
 
 **"Are the Spanish translations reviewed?"**
 They are drafts, marked in the app as pending review by a clinician and a

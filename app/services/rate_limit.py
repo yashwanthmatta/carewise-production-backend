@@ -9,10 +9,17 @@ from app.core.config import settings
 from app.models.carewise import RateLimitBucket
 
 
-def check_rate_limit(db: Session, request: Request, action: str, identifier: str = "") -> None:
+def check_rate_limit(
+    db: Session,
+    request: Request,
+    action: str,
+    identifier: str = "",
+    max_attempts: int | None = None,
+    window_seconds: int | None = None,
+) -> None:
     now = datetime.now(timezone.utc)
-    window_seconds = settings.auth_rate_limit_window_seconds
-    max_attempts = settings.auth_rate_limit_max_attempts
+    window_seconds = window_seconds or settings.auth_rate_limit_window_seconds
+    max_attempts = max_attempts or settings.auth_rate_limit_max_attempts
     bucket_key = hashed_bucket_key(action, client_identifier(request, identifier))
     bucket = db.scalar(select(RateLimitBucket).where(RateLimitBucket.bucket_key == bucket_key))
     if bucket is None:

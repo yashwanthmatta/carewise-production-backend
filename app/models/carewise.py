@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -249,3 +249,38 @@ Index("idx_password_reset_user_created", PasswordResetToken.user_id, PasswordRes
 Index("idx_refresh_tokens_user_created", RefreshToken.user_id, RefreshToken.created_at.desc())
 Index("idx_email_verification_user_created", EmailVerificationToken.user_id, EmailVerificationToken.created_at.desc())
 Index("idx_rate_limit_action_window", RateLimitBucket.action, RateLimitBucket.window_start.desc())
+
+
+# Product signals for learning whether CareWise helps. None of these tables store
+# report text, IP addresses or account ids.
+class UsageCounter(Base):
+    __tablename__ = "usage_counters"
+    __table_args__ = (UniqueConstraint("day", "name", "source", name="uq_usage_counters_day_name_source"),)
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("use"))
+    day: Mapped[str] = mapped_column(String(10), index=True)
+    name: Mapped[str] = mapped_column(String(60), index=True)
+    source: Mapped[str] = mapped_column(String(20), default="web")
+    count: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class ProductFeedback(Base):
+    __tablename__ = "product_feedback"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("fb"))
+    helpful: Mapped[str] = mapped_column(String(10), index=True)
+    encrypted_comment: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(20), default="web")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EarlyAccessSignup(Base):
+    __tablename__ = "early_access_signups"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("ea"))
+    email_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    encrypted_email: Mapped[str] = mapped_column(Text)
+    role: Mapped[str] = mapped_column(String(40), index=True, default="other")
+    encrypted_note: Mapped[str] = mapped_column(Text, default="")
+    source: Mapped[str] = mapped_column(String(20), default="web")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

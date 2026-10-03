@@ -251,3 +251,45 @@ class DataDeletionRequestIn(BaseModel):
 class DataDeletionRequestOut(BaseModel):
     id: str
     status: str
+
+
+USAGE_EVENTS = (
+    "report_explained",
+    "sample_opened",
+    "demo_started",
+    "demo_finished",
+    "pdf_read",
+    "doctor_brief_opened",
+    "spanish_used",
+    "early_access_opened",
+)
+SIGNAL_SOURCES = ("web", "mobile")
+EARLY_ACCESS_ROLES = ("caregiver", "patient", "clinician", "other")
+
+
+class UsageEventIn(BaseModel):
+    name: str = Field(max_length=60)
+    source: str = Field(default="web", max_length=20)
+
+
+class FeedbackIn(BaseModel):
+    helpful: bool
+    comment: str = Field(default="", max_length=500)
+    source: str = Field(default="web", max_length=20)
+
+
+class EarlyAccessIn(BaseModel):
+    email: EmailStr
+    role: str = Field(default="other", max_length=40)
+    note: str = Field(default="", max_length=500)
+    consent: bool
+    source: str = Field(default="web", max_length=20)
+
+
+class FeedbackCommentIn(BaseModel):
+    comment: str = Field(min_length=1, max_length=500)
+
+
+class SignalAccepted(BaseModel):
+    ok: bool = True
+    id: str | None = None

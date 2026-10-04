@@ -76,6 +76,17 @@ class Settings(BaseSettings):
     # Founder-only access to feedback counts and early-access sign-ups. Set it in the
     # hosting dashboard; when empty the summary endpoint stays switched off.
     founder_token: str = ""
+    # Clinician and admin roles are never self-assigned. List staff as
+    # "email:role" pairs, e.g. "doctor@clinic.org:clinician,me@carewise.app:admin".
+    staff_emails: str = ""
+
+    def staff_role_for(self, email: str) -> str | None:
+        wanted = (email or "").strip().lower()
+        for entry in self.clean_env_value(self.staff_emails).split(","):
+            address, _, role = entry.strip().partition(":")
+            if address.strip().lower() == wanted and role.strip() in {"clinician", "admin"}:
+                return role.strip()
+        return None
     max_report_file_bytes: int = 10 * 1024 * 1024
     allowed_report_content_types: str = "text/plain,application/pdf,image/png,image/jpeg,image/webp,image/heic"
 

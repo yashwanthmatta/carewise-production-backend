@@ -72,10 +72,17 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired authentication token.",
             )
+        # Elevated roles must be on the staff list; anything else acts as a patient,
+        # and the stored role is corrected so it stays that way.
+        role = user.role
+        if role != "patient" and settings.staff_role_for(user.email) != role:
+            role = "patient"
+            user.role = role
+            db.commit()
         return CurrentUser(
             user_id=user.id,
             email=user.email,
-            role=user.role,
+            role=role,
         )
     except JWTError as error:
         raise HTTPException(

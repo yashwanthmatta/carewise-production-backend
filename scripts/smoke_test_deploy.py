@@ -231,7 +231,7 @@ def main() -> int:
             },
             token,
         )
-        subscription = request_json("POST", f"{base_url}/subscriptions/checkout", {"plan_code": "basic"}, token)
+        subscription = request_json("POST", f"{base_url}/subscriptions/checkout", {"plan_code": "plus"}, token)
         notification = request_json(
             "POST",
             f"{base_url}/notifications/devices",

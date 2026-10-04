@@ -20,30 +20,32 @@ from app.services.audit import write_audit
 
 router = APIRouter()
 
+# Plan codes stay stable (stored on subscriptions); names and prices follow the
+# public pricing: Free, Plus $7 and Family $12 a month. Starting prices to test.
 SUBSCRIPTION_PLANS = {
     "basic": {
         "plan_code": "basic",
-        "name": "Basic",
-        "monthly_price_usd": 29,
-        "stripe_lookup_key": "carewise_basic_monthly",
-        "summary": "Education summaries, reminders, and local care plan export.",
-        "features": ["Report summaries", "Diet reminders", "Local care plan export"],
+        "name": "Free",
+        "monthly_price_usd": 0,
+        "stripe_lookup_key": "",
+        "summary": "Explain any report, take a doctor brief, keep a health record.",
+        "features": ["Explain any lab or scan report", "One-page doctor brief", "Lifetime health record"],
     },
     "plus": {
         "plan_code": "plus",
         "name": "Plus",
-        "monthly_price_usd": 79,
+        "monthly_price_usd": 7,
         "stripe_lookup_key": "carewise_plus_monthly",
-        "summary": "Care planning, insurance guidance, and monthly review workflow.",
-        "features": ["Care plan sync", "Insurance guidance", "Monthly review workflow"],
+        "summary": "Personal plans, reminders and trends over the years.",
+        "features": ["Personal plan from your own results", "Reminders", "Trends over the years"],
     },
     "premium": {
         "plan_code": "premium",
-        "name": "Premium",
-        "monthly_price_usd": 149,
-        "stripe_lookup_key": "carewise_premium_monthly",
-        "summary": "Priority navigation, weekly coaching workflow, and concierge handoff.",
-        "features": ["Priority matching", "Weekly coaching workflow", "Concierge handoff"],
+        "name": "Family",
+        "monthly_price_usd": 12,
+        "stripe_lookup_key": "carewise_family_monthly",
+        "summary": "Everything in Plus for up to 5 people, shared with caregivers.",
+        "features": ["Everything in Plus", "Up to 5 family members", "Shared with siblings and caregivers"],
     },
 }
 
@@ -62,6 +64,8 @@ def create_checkout(
     plan = SUBSCRIPTION_PLANS.get(payload.plan_code)
     if plan is None:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unknown subscription plan.")
+    if not plan["monthly_price_usd"]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The Free plan needs no payment.")
     subscription = Subscription(
         user_id=user.user_id,
         plan_code=payload.plan_code,

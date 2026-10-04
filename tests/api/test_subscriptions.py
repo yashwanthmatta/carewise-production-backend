@@ -21,8 +21,17 @@ def test_subscription_plans_are_public_and_structured():
         assert response.status_code == 200
         plans = response.json()
         assert [plan["plan_code"] for plan in plans] == ["basic", "plus", "premium"]
-        assert plans[0]["monthly_price_usd"] == 29
+        assert [plan["name"] for plan in plans] == ["Free", "Plus", "Family"]
+        assert [plan["monthly_price_usd"] for plan in plans] == [0, 7, 12]
         assert plans[0]["features"]
+
+
+def test_free_plan_needs_no_checkout():
+    app = create_app()
+    with TestClient(app) as client:
+        headers, _ = auth_headers(client)
+        response = client.post("/subscriptions/checkout", json={"plan_code": "basic", "payment_provider": "manual"}, headers=headers)
+        assert response.status_code == 400
 
 
 def test_subscription_checkout_uses_known_plan():

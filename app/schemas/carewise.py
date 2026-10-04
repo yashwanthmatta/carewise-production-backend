@@ -259,6 +259,7 @@ USAGE_EVENTS = (
     "demo_started",
     "demo_finished",
     "pdf_read",
+    "photo_read",
     "doctor_brief_opened",
     "spanish_used",
     "early_access_opened",

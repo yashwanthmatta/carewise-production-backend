@@ -50,6 +50,27 @@ def request_multipart(url: str, fields: dict[str, str], file_field: str, file_na
         return json.loads(response.read().decode("utf-8"))
 
 
+def status_of(method: str, url: str, payload: Optional[dict] = None) -> int:
+    # Returns the HTTP status without raising, for checks that expect an error code.
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    request = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"}, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+
+
+def check_product_routes(base_url: str) -> dict:
+    # Proves the feedback and early-access routes are deployed without writing any data:
+    # an unknown event is rejected (422) and the founder summary needs a token (401, or 404 when off).
+    event_status = status_of("POST", f"{base_url}/product/events", {"name": "smoke_check"})
+    summary_status = status_of("GET", f"{base_url}/product/summary")
+    if event_status != 422 or summary_status not in (401, 404):
+        raise RuntimeError(f"Product routes not deployed as expected (events {event_status}, summary {summary_status}).")
+    return {"events": event_status, "summary": summary_status, "founder_view": "on" if summary_status == 401 else "off"}
+
+
 def wait_for_health(base_url: str, wait_seconds: int) -> dict:
     # Free-tier hosts sleep when idle; the first request can take a minute to wake them.
     deadline = time.monotonic() + wait_seconds
@@ -87,6 +108,7 @@ def main() -> int:
         health = wait_for_health(base_url, args.wake_seconds)
         features = request_json("GET", f"{base_url}/features")
         ready = request_json("GET", f"{base_url}/ready")
+        product_routes = check_product_routes(base_url)
         signup = request_json(
             "POST",
             f"{base_url}/auth/signup",
@@ -292,6 +314,7 @@ def main() -> int:
                 "privacy_export_care_plans": len(export["care_plans"]),
                 "privacy_export_lab_trends": len(export["lab_trends"]),
                 "cleanup": deletion["status"],
+                "product_routes": product_routes,
             },
             indent=2,
         )

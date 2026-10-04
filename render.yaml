@@ -13,6 +13,8 @@ services:
           property: connectionString
       - key: CAREWISE_JWT_SECRET
         sync: false
+      - key: CAREWISE_FOUNDER_TOKEN
+        sync: false
       - key: CAREWISE_FIELD_ENCRYPTION_KEY
         sync: false
       - key: CAREWISE_ACCESS_TOKEN_MINUTES

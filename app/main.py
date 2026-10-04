@@ -18,6 +18,7 @@ from app.api.routes import (
     notifications,
     patients,
     privacy,
+    product,
     recommendations,
     reports,
     subscriptions,
@@ -79,6 +80,7 @@ def create_app() -> FastAPI:
     app.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
     app.include_router(privacy.router, prefix="/privacy", tags=["privacy"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
+    app.include_router(product.router, prefix="/product", tags=["product"])
 
     @app.on_event("startup")
     def startup() -> None:

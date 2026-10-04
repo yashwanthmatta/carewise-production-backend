@@ -73,6 +73,9 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     auth_rate_limit_window_seconds: int = 900
     auth_rate_limit_max_attempts: int = 8
+    # Founder-only access to feedback counts and early-access sign-ups. Set it in the
+    # hosting dashboard; when empty the summary endpoint stays switched off.
+    founder_token: str = ""
     max_report_file_bytes: int = 10 * 1024 * 1024
     allowed_report_content_types: str = "text/plain,application/pdf,image/png,image/jpeg,image/webp,image/heic"
 

@@ -45,6 +45,13 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists.")
+    # Anyone can create a patient account; clinician and admin roles come only from
+    # the staff list, because they can see other people's reports.
+    if payload.role != "patient" and settings.staff_role_for(payload.email) != payload.role:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Clinician and admin accounts are set up by the CareWise team.",
+        )
     user = User(
         email=payload.email,
         password_hash=hash_password(payload.password),

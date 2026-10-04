@@ -109,6 +109,10 @@ def main() -> int:
         features = request_json("GET", f"{base_url}/features")
         ready = request_json("GET", f"{base_url}/ready")
         product_routes = check_product_routes(base_url)
+        # Public sign-up must never hand out the admin role (refused before any account is created).
+        admin_signup_status = status_of("POST", f"{base_url}/auth/signup", {"email": f"smoke-admin-{int(time.time())}@example.com", "password": args.password, "role": "admin"})
+        if admin_signup_status != 403:
+            raise RuntimeError(f"Public admin sign-up was not refused (status {admin_signup_status}).")
         signup = request_json(
             "POST",
             f"{base_url}/auth/signup",
@@ -315,6 +319,7 @@ def main() -> int:
                 "privacy_export_lab_trends": len(export["lab_trends"]),
                 "cleanup": deletion["status"],
                 "product_routes": product_routes,
+                "public_admin_signup": admin_signup_status,
             },
             indent=2,
         )

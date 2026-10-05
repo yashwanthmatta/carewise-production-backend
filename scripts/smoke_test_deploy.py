@@ -119,6 +119,10 @@ def main() -> int:
             {"email": email, "password": args.password, "role": "patient"},
         )
         token = signup["access_token"]
+        # New accounts start on the Free plan (checks the plans and payments routes are deployed).
+        plan = request_json("GET", f"{base_url}/subscriptions/me", token=token)
+        if plan.get("plan_code") != "basic":
+            raise RuntimeError(f"New account is not on the Free plan: {plan}")
         consent = request_json(
             "POST",
             f"{base_url}/consent",
@@ -291,7 +295,10 @@ def main() -> int:
                     "report_uploads": features.get("report_uploads"),
                     "image_ocr": features.get("image_ocr"),
                     "stripe_checkout": features.get("stripe_checkout"),
+                    "stripe_webhook": features.get("stripe_webhook"),
+                    "help_assistant": features.get("help_assistant"),
                 },
+                "plan": plan.get("plan_name"),
                 "signup_email": email,
                 "consent_id": consent["id"],
                 "patient_id": profile["patient_id"],

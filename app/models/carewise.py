@@ -210,6 +210,7 @@ class Subscription(Base):
     status: Mapped[str] = mapped_column(String(80), index=True, default="pending")
     payment_provider: Mapped[str] = mapped_column(String(80), default="manual")
     provider_reference: Mapped[str] = mapped_column(String(160), default="")
+    provider_customer: Mapped[str] = mapped_column(String(160), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import (
     admin,
+    assistant,
     auth,
     care_plans,
     clinical_review,
@@ -81,6 +82,7 @@ def create_app() -> FastAPI:
     app.include_router(privacy.router, prefix="/privacy", tags=["privacy"])
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(product.router, prefix="/product", tags=["product"])
+    app.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
 
     @app.on_event("startup")
     def startup() -> None:

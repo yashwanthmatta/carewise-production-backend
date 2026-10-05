@@ -15,7 +15,13 @@ from app.core.rbac import Role, require_roles
 from app.core.security import CurrentUser
 from app.db.session import get_db
 from app.models.carewise import Subscription
-from app.schemas.carewise import SubscriptionCheckoutIn, SubscriptionCheckoutOut, SubscriptionPlanOut
+from app.schemas.carewise import (
+    BillingPortalOut,
+    SubscriptionCheckoutIn,
+    SubscriptionCheckoutOut,
+    SubscriptionMeOut,
+    SubscriptionPlanOut,
+)
 from app.services.audit import write_audit
 
 router = APIRouter()
@@ -53,6 +59,48 @@ SUBSCRIPTION_PLANS = {
 @router.get("/plans", response_model=list[SubscriptionPlanOut])
 def list_subscription_plans():
     return [SubscriptionPlanOut(**plan) for plan in SUBSCRIPTION_PLANS.values()]
+
+
+# Paid statuses that still count as the person's current plan.
+CURRENT_STATUSES = ("active", "past_due")
+
+
+def current_subscription(db: Session, user_id: str) -> Subscription | None:
+    return db.scalar(
+        select(Subscription)
+        .where(Subscription.user_id == user_id, Subscription.status.in_(CURRENT_STATUSES))
+        .order_by(Subscription.created_at.desc())
+    )
+
+
+@router.get("/me", response_model=SubscriptionMeOut)
+def my_subscription(
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    subscription = current_subscription(db, user.user_id)
+    plan = SUBSCRIPTION_PLANS.get(subscription.plan_code if subscription else "basic", SUBSCRIPTION_PLANS["basic"])
+    return SubscriptionMeOut(
+        plan_code=plan["plan_code"],
+        plan_name=plan["name"],
+        status=subscription.status if subscription else "free",
+        payments_enabled=stripe_enabled(),
+        can_manage_billing=bool(stripe_enabled() and subscription and subscription.provider_customer),
+    )
+
+
+@router.post("/portal", response_model=BillingPortalOut)
+def billing_portal(
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    subscription = current_subscription(db, user.user_id)
+    if not stripe_enabled() or subscription is None or not subscription.provider_customer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No paid plan to manage yet.")
+    portal_url = create_stripe_portal_session(subscription.provider_customer)
+    write_audit(db, user.user_id, "", "subscription_portal_opened", "subscription", subscription.id, {})
+    db.commit()
+    return BillingPortalOut(portal_url=portal_url)
 
 
 @router.post("/checkout", response_model=SubscriptionCheckoutOut)
@@ -125,6 +173,9 @@ async def stripe_webhook(
     provider_subscription_id = event_object.get("subscription") or event_object.get("id")
     if isinstance(provider_subscription_id, str) and provider_subscription_id.startswith("sub_"):
         subscription.provider_reference = provider_subscription_id
+    customer_id = event_object.get("customer")
+    if isinstance(customer_id, str) and customer_id.startswith("cus_"):
+        subscription.provider_customer = customer_id
 
     write_audit(
         db,
@@ -145,6 +196,31 @@ def stripe_enabled() -> bool:
 
 def manual_checkout_url(plan: dict, subscription_id: str) -> str:
     return f"https://payments.example.com/carewise/{plan['plan_code']}/{subscription_id}"
+
+
+def stripe_post(path: str, data: dict) -> dict:
+    request = urllib.request.Request(
+        f"https://api.stripe.com/v1/{path}",
+        data=urllib.parse.urlencode(data).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {settings.clean_env_value(settings.stripe_secret_key)}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe could not be reached.") from exc
+
+
+def create_stripe_portal_session(customer_id: str) -> str:
+    payload = stripe_post("billing_portal/sessions", {"customer": customer_id, "return_url": settings.frontend_url})
+    portal_url = payload.get("url")
+    if not portal_url:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe billing page response was incomplete.")
+    return portal_url
 
 
 def create_stripe_checkout_session(plan: dict, subscription_id: str, customer_email: str) -> dict:

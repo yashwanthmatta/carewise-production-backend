@@ -52,6 +52,11 @@ class Settings(BaseSettings):
         default="gpt-5.5",
         validation_alias=AliasChoices("CAREWISE_OPENAI_OCR_MODEL", "OPENAI_OCR_MODEL"),
     )
+    anthropic_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("CAREWISE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
+    )
+    assistant_model: str = "claude-opus-5-5"
     stripe_secret_key: str = Field(
         default="",
         validation_alias=AliasChoices("CAREWISE_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"),

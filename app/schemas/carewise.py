@@ -232,6 +232,18 @@ class SubscriptionCheckoutOut(BaseModel):
     checkout_url: str
 
 
+class SubscriptionMeOut(BaseModel):
+    plan_code: str
+    plan_name: str
+    status: str
+    payments_enabled: bool
+    can_manage_billing: bool
+
+
+class BillingPortalOut(BaseModel):
+    portal_url: str
+
+
 class NotificationDeviceIn(BaseModel):
     channel: str = "push"
     device_token: str = ""
@@ -294,3 +306,21 @@ class FeedbackCommentIn(BaseModel):
 class SignalAccepted(BaseModel):
     ok: bool = True
     id: str | None = None
+
+
+class AssistantTurn(BaseModel):
+    role: str = Field(pattern="^(user|assistant)$")
+    content: str = Field(min_length=1, max_length=2000)
+
+
+class AssistantChatIn(BaseModel):
+    messages: list[AssistantTurn] = Field(min_length=1, max_length=12)
+    # Only sent when the person ticks "share my result with the helper".
+    report_summary: str = Field(default="", max_length=4000)
+    language: str = Field(default="en", pattern="^(en|es)$")
+    source: str = "web"
+
+
+class AssistantChatOut(BaseModel):
+    reply: str
+    model: str

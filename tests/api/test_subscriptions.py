@@ -129,3 +129,59 @@ def stripe_signature(payload: dict, secret: str) -> str:
     body = json.dumps(payload)
     digest = hmac.new(secret.encode("utf-8"), f"{timestamp}.{body}".encode("utf-8"), hashlib.sha256).hexdigest()
     return f"t={timestamp},v1={digest}"
+
+
+def test_my_plan_defaults_to_free():
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        response = client.get("/subscriptions/me", headers=headers)
+        assert response.status_code == 200
+        assert response.json()["plan_code"] == "basic"
+        assert response.json()["status"] == "free"
+        assert response.json()["can_manage_billing"] is False
+        assert client.post("/subscriptions/portal", headers=headers).status_code == 404
+        assert client.get("/subscriptions/me").status_code == 401
+
+
+def test_paid_plan_can_open_billing_portal(monkeypatch):
+    monkeypatch.setattr(settings, "stripe_webhook_secret", "whsec_test_secret")
+    monkeypatch.setattr(subscriptions, "stripe_enabled", lambda: True)
+    monkeypatch.setattr(
+        subscriptions,
+        "create_stripe_checkout_session",
+        lambda plan, subscription_id, customer_email: {"id": "cs_test_family", "url": "https://checkout.stripe.com/c/pay/cs"},
+    )
+    opened = []
+    monkeypatch.setattr(
+        subscriptions,
+        "create_stripe_portal_session",
+        lambda customer_id: opened.append(customer_id) or "https://billing.stripe.com/p/session/test",
+    )
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        subscription_id = client.post("/subscriptions/checkout", json={"plan_code": "premium"}, headers=headers).json()["id"]
+        payload = {
+            "type": "checkout.session.completed",
+            "data": {
+                "object": {
+                    "id": "cs_test_family",
+                    "client_reference_id": subscription_id,
+                    "subscription": "sub_stripe_family",
+                    "customer": "cus_test_family",
+                    "payment_status": "paid",
+                }
+            },
+        }
+        client.post(
+            "/subscriptions/webhook",
+            content=json.dumps(payload),
+            headers={"Stripe-Signature": stripe_signature(payload, "whsec_test_secret")},
+        )
+        me = client.get("/subscriptions/me", headers=headers).json()
+        assert me["plan_name"] == "Family"
+        assert me["status"] == "active"
+        assert me["can_manage_billing"] is True
+        portal = client.post("/subscriptions/portal", headers=headers)
+        assert portal.status_code == 200
+        assert portal.json()["portal_url"].startswith("https://billing.stripe.com/")
+        assert opened == ["cus_test_family"]

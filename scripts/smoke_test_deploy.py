@@ -61,6 +61,25 @@ def status_of(method: str, url: str, payload: Optional[dict] = None) -> int:
         return error.code
 
 
+def check_help_assistant(base_url: str, enabled: bool) -> dict:
+    # When the AI key is set, ask one short question to prove the key really works.
+    if not enabled:
+        return {"enabled": False}
+    question = {"messages": [{"role": "user", "content": "In one sentence, what does CareWise do?"}], "source": "web"}
+    request = urllib.request.Request(
+        f"{base_url}/assistant/chat",
+        data=json.dumps(question).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            answer = json.loads(response.read().decode("utf-8"))
+            return {"enabled": True, "status": response.status, "answered": bool(answer.get("reply")), "model": answer.get("model", "")}
+    except urllib.error.HTTPError as error:
+        return {"enabled": True, "status": error.code, "answered": False}
+
+
 def check_product_routes(base_url: str) -> dict:
     # Proves the feedback and early-access routes are deployed without writing any data:
     # an unknown event is rejected (422) and the founder summary needs a token (401, or 404 when off).
@@ -109,6 +128,7 @@ def main() -> int:
         features = request_json("GET", f"{base_url}/features")
         ready = request_json("GET", f"{base_url}/ready")
         product_routes = check_product_routes(base_url)
+        help_assistant = check_help_assistant(base_url, bool(features.get("help_assistant")))
         # Public sign-up must never hand out the admin role (refused before any account is created).
         admin_signup_status = status_of("POST", f"{base_url}/auth/signup", {"email": f"smoke-admin-{int(time.time())}@example.com", "password": args.password, "role": "admin"})
         if admin_signup_status != 403:
@@ -299,6 +319,7 @@ def main() -> int:
                     "help_assistant": features.get("help_assistant"),
                 },
                 "plan": plan.get("plan_name"),
+                "help_assistant": help_assistant,
                 "signup_email": email,
                 "consent_id": consent["id"],
                 "patient_id": profile["patient_id"],

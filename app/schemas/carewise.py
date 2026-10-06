@@ -324,3 +324,36 @@ class AssistantChatIn(BaseModel):
 class AssistantChatOut(BaseModel):
     reply: str
     model: str
+
+
+class DoctorShareIn(BaseModel):
+    # The summary the family chose to share, built on their device (values, findings,
+    # questions, health record). Shown read-only to whoever has the link.
+    snapshot: dict
+    label: str = Field(default="", max_length=80)
+    days: int = Field(default=7, ge=1, le=30)
+
+
+class DoctorShareOut(BaseModel):
+    id: str
+    label: str
+    expires_at: datetime
+    revoked: bool
+    view_count: int
+    last_viewed_at: datetime | None
+    created_at: datetime | None
+
+
+class DoctorShareCreatedOut(DoctorShareOut):
+    token: str
+
+
+class DoctorShareViewIn(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+
+
+class DoctorShareViewOut(BaseModel):
+    label: str
+    snapshot: dict
+    expires_at: datetime
+    created_at: datetime | None

@@ -22,6 +22,7 @@ from app.api.routes import (
     product,
     recommendations,
     reports,
+    shares,
     subscriptions,
 )
 from app.core.config import settings
@@ -83,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router, prefix="/admin", tags=["admin"])
     app.include_router(product.router, prefix="/product", tags=["product"])
     app.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
+    app.include_router(shares.router, prefix="/shares", tags=["shares"])
 
     @app.on_event("startup")
     def startup() -> None:

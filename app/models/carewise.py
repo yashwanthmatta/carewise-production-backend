@@ -285,3 +285,20 @@ class EarlyAccessSignup(Base):
     encrypted_note: Mapped[str] = mapped_column(Text, default="")
     source: Mapped[str] = mapped_column(String(20), default="web")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DoctorShare(Base):
+    # A read-only, expiring link a patient or caregiver gives to their doctor. Only a
+    # hash of the link token is stored, and the shared summary is encrypted.
+    __tablename__ = "doctor_shares"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("share"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    encrypted_label: Mapped[str] = mapped_column(Text, default="")
+    encrypted_snapshot: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    view_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

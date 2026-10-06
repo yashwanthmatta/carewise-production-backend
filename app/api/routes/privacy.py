@@ -13,6 +13,7 @@ from app.models.carewise import (
     CarePlan,
     ConsentRecord,
     DataDeletionRequest,
+    DoctorShare,
     EmailVerificationToken,
     Intake,
     LabTrend,
@@ -247,6 +248,7 @@ def delete_my_account_data(
     db.execute(delete(ConsentRecord).where(ConsentRecord.user_id == user.user_id))
     db.execute(delete(NotificationPreference).where(NotificationPreference.user_id == user.user_id))
     db.execute(delete(Subscription).where(Subscription.user_id == user.user_id))
+    db.execute(delete(DoctorShare).where(DoctorShare.user_id == user.user_id))
     db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.user_id))
     db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.user_id))
     db.execute(delete(EmailVerificationToken).where(EmailVerificationToken.user_id == user.user_id))

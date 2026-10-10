@@ -12,8 +12,11 @@ from app.models.carewise import (
     AuditEvent,
     CarePlan,
     ConsentRecord,
+    Clinic,
+    ClinicMember,
     DataDeletionRequest,
     DoctorShare,
+    LabPacket,
     EmailVerificationToken,
     Intake,
     LabTrend,
@@ -249,6 +252,12 @@ def delete_my_account_data(
     db.execute(delete(NotificationPreference).where(NotificationPreference.user_id == user.user_id))
     db.execute(delete(Subscription).where(Subscription.user_id == user.user_id))
     db.execute(delete(DoctorShare).where(DoctorShare.user_id == user.user_id))
+    owned_clinic_ids = list(db.scalars(select(Clinic.id).where(Clinic.owner_user_id == user.user_id)))
+    if owned_clinic_ids:
+        db.execute(delete(LabPacket).where(LabPacket.clinic_id.in_(owned_clinic_ids)))
+        db.execute(delete(ClinicMember).where(ClinicMember.clinic_id.in_(owned_clinic_ids)))
+        db.execute(delete(Clinic).where(Clinic.id.in_(owned_clinic_ids)))
+    db.execute(delete(ClinicMember).where(ClinicMember.user_id == user.user_id))
     db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.user_id))
     db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.user_id))
     db.execute(delete(EmailVerificationToken).where(EmailVerificationToken.user_id == user.user_id))

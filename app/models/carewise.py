@@ -302,3 +302,52 @@ class DoctorShare(Base):
     view_count: Mapped[int] = mapped_column(Integer, default=0)
     last_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Clinic(Base):
+    # DocBridge: a practice that reviews lab explanations before they reach patients.
+    __tablename__ = "clinics"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("clinic"))
+    name: Mapped[str] = mapped_column(String(160))
+    tone: Mapped[str] = mapped_column(String(20), default="friendly")
+    retention_days: Mapped[int] = mapped_column(Integer, default=90)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ClinicMember(Base):
+    __tablename__ = "clinic_members"
+    __table_args__ = (UniqueConstraint("clinic_id", "user_id", name="uq_clinic_members_clinic_user"),)
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("member"))
+    clinic_id: Mapped[str] = mapped_column(ForeignKey("clinics.id"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    display_name: Mapped[str] = mapped_column(String(160), default="")
+    role: Mapped[str] = mapped_column(String(20), default="clinician")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class LabPacket(Base):
+    # One lab result explained for one patient. Everything clinical is encrypted; the
+    # patient is identified only by a clinic-chosen reference (never an SSN).
+    __tablename__ = "lab_packets"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("packet"))
+    clinic_id: Mapped[str] = mapped_column(ForeignKey("clinics.id"), index=True)
+    patient_ref_hash: Mapped[str] = mapped_column(String(64), index=True)
+    encrypted_patient_ref: Mapped[str] = mapped_column(Text)
+    lab_date: Mapped[str] = mapped_column(String(10), default="")
+    encrypted_markers: Mapped[str] = mapped_column(Text, default="")
+    encrypted_summary: Mapped[str] = mapped_column(Text, default="")
+    encrypted_questions: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), index=True, default="draft")
+    created_by: Mapped[str] = mapped_column(String(80), default="")
+    approved_by: Mapped[str] = mapped_column(String(80), default="")
+    approved_by_name: Mapped[str] = mapped_column(String(160), default="")
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    patient_token_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    patient_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

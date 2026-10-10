@@ -357,3 +357,64 @@ class DoctorShareViewOut(BaseModel):
     snapshot: dict
     expires_at: datetime
     created_at: datetime | None
+
+
+class ClinicIn(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    clinician_name: str = Field(min_length=2, max_length=160)
+    tone: str = Field(default="friendly", pattern="^(friendly|formal)$")
+
+
+class ClinicOut(BaseModel):
+    id: str
+    name: str
+    tone: str
+    retention_days: int
+    clinician_name: str
+    member_role: str
+
+
+class LabMarker(BaseModel):
+    name: str = Field(max_length=120)
+    value: str = Field(max_length=40)
+    unit: str = Field(default="", max_length=30)
+    range: str = Field(default="", max_length=60)
+    status: str = Field(default="", max_length=40)
+    low_confidence: bool = False
+
+
+class LabPacketIn(BaseModel):
+    patient_ref: str = Field(min_length=1, max_length=60)
+    lab_date: str = Field(default="", pattern=r"^(\d{4}-\d{2}-\d{2})?$")
+    markers: list[LabMarker] = Field(default_factory=list, max_length=80)
+    summary: str = Field(default="", max_length=6000)
+    questions: list[str] = Field(default_factory=list, max_length=10)
+    deidentified_confirmed: bool = False
+
+
+class LabPacketEditIn(BaseModel):
+    summary: str = Field(max_length=6000)
+    questions: list[str] = Field(default_factory=list, max_length=10)
+
+
+class LabPacketOut(BaseModel):
+    id: str
+    patient_ref: str
+    lab_date: str
+    markers: list[dict]
+    summary: str
+    questions: list[str]
+    status: str
+    approved_by_name: str
+    approved_at: datetime | None
+    review_seconds: int | None
+    patient_viewed: bool
+    created_at: datetime | None
+
+
+class LabPacketApprovedOut(LabPacketOut):
+    patient_token: str
+
+
+class PacketViewIn(BaseModel):
+    token: str = Field(min_length=20, max_length=200)

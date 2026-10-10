@@ -409,6 +409,7 @@ class LabPacketOut(BaseModel):
     approved_at: datetime | None
     review_seconds: int | None
     patient_viewed: bool
+    edited: bool | None = None
     created_at: datetime | None
 
 
@@ -418,3 +419,12 @@ class LabPacketApprovedOut(LabPacketOut):
 
 class PacketViewIn(BaseModel):
     token: str = Field(min_length=20, max_length=200)
+
+
+class ClinicInviteIn(BaseModel):
+    role: str = Field(default="clinician", pattern="^(clinician|front_desk)$")
+
+
+class ClinicJoinIn(BaseModel):
+    code: str = Field(min_length=8, max_length=40)
+    display_name: str = Field(min_length=2, max_length=160)

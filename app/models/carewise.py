@@ -347,7 +347,22 @@ class LabPacket(Base):
     approved_by_name: Mapped[str] = mapped_column(String(160), default="")
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     review_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    encrypted_draft: Mapped[str] = mapped_column(Text, default="")
+    edited: Mapped[int | None] = mapped_column(Integer, nullable=True)
     patient_token_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
     patient_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ClinicInvite(Base):
+    # One-time code a clinic owner gives a colleague to join the practice.
+    __tablename__ = "clinic_invites"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("invite"))
+    clinic_id: Mapped[str] = mapped_column(ForeignKey("clinics.id"), index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    role: Mapped[str] = mapped_column(String(20), default="clinician")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

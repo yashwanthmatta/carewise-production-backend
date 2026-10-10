@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session
 from app.core.crypto import decrypt_field, encrypt_field
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
-from app.models.carewise import Clinic, ClinicMember, LabPacket
+from app.models.carewise import AuditEvent, Clinic, ClinicInvite, ClinicMember, LabPacket
 from app.schemas.carewise import (
     ClinicIn,
+    ClinicInviteIn,
+    ClinicJoinIn,
     ClinicOut,
     LabPacketApprovedOut,
     LabPacketEditIn,
@@ -30,6 +32,9 @@ from app.services.rate_limit import check_rate_limit
 router = APIRouter()
 
 PATIENT_LINK_DAYS = 30
+INVITE_DAYS = 7
+APPROVER_ROLES = {"owner", "clinician"}
+CLOSED_STATUSES = {"approved", "rejected"}
 NOT_AVAILABLE = "This link has expired or is not available. Please contact your clinic."
 
 
@@ -83,8 +88,14 @@ def packet_out(packet: LabPacket) -> dict:
         "approved_at": as_utc(packet.approved_at),
         "review_seconds": packet.review_seconds,
         "patient_viewed": packet.patient_viewed_at is not None,
+        "edited": None if packet.edited is None else bool(packet.edited),
         "created_at": packet.created_at,
     }
+
+
+def require_approver(member: ClinicMember) -> None:
+    if member.role not in APPROVER_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only a clinician can approve or reject.")
 
 
 def clinic_out(clinic: Clinic, member: ClinicMember) -> dict:
@@ -139,8 +150,10 @@ def create_packet(
         lab_date=payload.lab_date,
         encrypted_markers=encrypt_field(json.dumps([marker.model_dump() for marker in payload.markers])),
         encrypted_summary=encrypt_field(payload.summary.strip()),
+        encrypted_draft=encrypt_field(payload.summary.strip()),
         encrypted_questions=encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()])),
-        status="draft",
+        # Nothing could be read: a person types the values in, never a guess.
+        status="draft" if payload.markers else "manual_review",
         created_by=user.user_id,
     )
     db.add(packet)
@@ -171,8 +184,8 @@ def edit_packet(
 ):
     membership(db, user, clinic_id)
     packet = clinic_packet(db, clinic_id, packet_id)
-    if packet.status == "approved":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approved packets can't be edited.")
+    if packet.status in CLOSED_STATUSES:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approved or rejected packets can't be edited.")
     packet.encrypted_summary = encrypt_field(payload.summary.strip())
     packet.encrypted_questions = encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()]))
     write_audit(db, user.user_id, "", "packet_edited", "lab_packet", packet.id, {})
@@ -190,13 +203,15 @@ def approve_packet(
     db: Session = Depends(get_db),
 ):
     _, member = membership(db, user, clinic_id)
+    require_approver(member)
     packet = clinic_packet(db, clinic_id, packet_id)
-    if packet.status == "approved":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already approved.")
+    if packet.status in CLOSED_STATUSES:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already approved or rejected.")
     if not payload.summary.strip():
         raise HTTPException(status_code=422, detail="Add the patient explanation before approving.")
     now = datetime.now(timezone.utc)
     token = secrets.token_urlsafe(32)
+    packet.edited = int(payload.summary.strip() != decrypt_field(packet.encrypted_draft).strip())
     packet.encrypted_summary = encrypt_field(payload.summary.strip())
     packet.encrypted_questions = encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()]))
     packet.status = "approved"
@@ -206,7 +221,10 @@ def approve_packet(
     packet.review_seconds = max(0, int((now - (as_utc(packet.created_at) or now)).total_seconds()))
     packet.patient_token_hash = sha(token)
     packet.expires_at = now + timedelta(days=PATIENT_LINK_DAYS)
-    write_audit(db, user.user_id, "", "packet_approved", "lab_packet", packet.id, {"review_seconds": packet.review_seconds})
+    write_audit(
+        db, user.user_id, "", "packet_approved", "lab_packet", packet.id,
+        {"review_seconds": packet.review_seconds, "edited": bool(packet.edited), "by": member.display_name},
+    )
     db.commit()
     db.refresh(packet)
     return {**packet_out(packet), "patient_token": token}
@@ -216,12 +234,91 @@ def approve_packet(
 def mark_follow_up(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     membership(db, user, clinic_id)
     packet = clinic_packet(db, clinic_id, packet_id)
-    if packet.status != "approved":
+    if packet.status not in CLOSED_STATUSES:
         packet.status = "needs_call"
     write_audit(db, user.user_id, "", "packet_needs_call", "lab_packet", packet.id, {})
     db.commit()
     db.refresh(packet)
     return packet_out(packet)
+
+
+@router.post("/{clinic_id}/packets/{packet_id}/reject", response_model=LabPacketOut)
+def reject_packet(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    _, member = membership(db, user, clinic_id)
+    require_approver(member)
+    packet = clinic_packet(db, clinic_id, packet_id)
+    if packet.status == "approved":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approved packets can't be rejected.")
+    packet.status = "rejected"
+    write_audit(db, user.user_id, "", "packet_rejected", "lab_packet", packet.id, {"by": member.display_name})
+    db.commit()
+    db.refresh(packet)
+    return packet_out(packet)
+
+
+ACTION_LABELS = {
+    "packet_drafted": "Draft created",
+    "packet_edited": "Draft edited",
+    "packet_approved": "Approved and patient link created",
+    "packet_needs_call": "Marked as needs a follow-up call",
+    "packet_rejected": "Rejected, not sent",
+    "packet_viewed_by_patient": "Opened by the patient",
+}
+
+
+@router.get("/{clinic_id}/packets/{packet_id}/audit")
+def packet_audit(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership(db, user, clinic_id)
+    clinic_packet(db, clinic_id, packet_id)
+    names = {m.user_id: m.display_name for m in db.scalars(select(ClinicMember).where(ClinicMember.clinic_id == clinic_id))}
+    events = db.scalars(
+        select(AuditEvent).where(AuditEvent.resource_type == "lab_packet", AuditEvent.resource_id == packet_id).order_by(AuditEvent.created_at)
+    ).all()
+    return [
+        {
+            "action": ACTION_LABELS.get(event.action, event.action),
+            "who": "Patient" if event.actor_id == "patient_link" else names.get(event.actor_id, "Former team member"),
+            "at": as_utc(event.created_at),
+        }
+        for event in events
+    ]
+
+
+@router.post("/{clinic_id}/invites")
+def create_invite(clinic_id: str, payload: ClinicInviteIn, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    _, member = membership(db, user, clinic_id)
+    if member.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the clinic owner can invite people.")
+    code = secrets.token_urlsafe(9)
+    expires = datetime.now(timezone.utc) + timedelta(days=INVITE_DAYS)
+    db.add(ClinicInvite(clinic_id=clinic_id, code_hash=sha(code), role=payload.role, expires_at=expires))
+    write_audit(db, user.user_id, "", "clinic_invite_created", "clinic", clinic_id, {"role": payload.role})
+    db.commit()
+    return {"code": code, "role": payload.role, "expires_at": expires}
+
+
+@router.post("/join", response_model=ClinicOut)
+def join_clinic(payload: ClinicJoinIn, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    if db.scalar(select(ClinicMember).where(ClinicMember.user_id == user.user_id)):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account already belongs to a clinic.")
+    invite = db.scalar(select(ClinicInvite).where(ClinicInvite.code_hash == sha(payload.code.strip())))
+    now = datetime.now(timezone.utc)
+    if invite is None or invite.used_at is not None or (as_utc(invite.expires_at) or now) <= now:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="This invite code is not valid. Ask for a new one.")
+    clinic = db.get(Clinic, invite.clinic_id)
+    member = ClinicMember(clinic_id=invite.clinic_id, user_id=user.user_id, display_name=payload.display_name.strip(), role=invite.role)
+    invite.used_at = now
+    db.add(member)
+    write_audit(db, user.user_id, "", "clinic_joined", "clinic", invite.clinic_id, {"role": invite.role})
+    db.commit()
+    return clinic_out(clinic, member)
+
+
+@router.get("/{clinic_id}/members")
+def list_members(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership(db, user, clinic_id)
+    members = db.scalars(select(ClinicMember).where(ClinicMember.clinic_id == clinic_id).order_by(ClinicMember.created_at)).all()
+    return [{"name": m.display_name, "role": m.role} for m in members]
 
 
 # Visit-ready summary: every packet for one patient, with what changed between labs.
@@ -255,6 +352,7 @@ def clinic_metrics(clinic_id: str, user: CurrentUser = Depends(get_current_user)
     reviews = [p.review_seconds for p in approved if p.review_seconds is not None]
     return {
         "drafts": sum(1 for p in packets if p.status == "draft"),
+        "manual_review": sum(1 for p in packets if p.status == "manual_review"),
         "needs_call": sum(1 for p in packets if p.status == "needs_call"),
         "approved_this_week": len(this_week),
         "median_review_seconds": int(statistics.median(reviews)) if reviews else None,

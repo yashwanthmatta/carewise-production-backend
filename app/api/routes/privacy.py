@@ -13,6 +13,7 @@ from app.models.carewise import (
     CarePlan,
     ConsentRecord,
     Clinic,
+    ClinicInvite,
     ClinicMember,
     DataDeletionRequest,
     DoctorShare,
@@ -255,6 +256,7 @@ def delete_my_account_data(
     owned_clinic_ids = list(db.scalars(select(Clinic.id).where(Clinic.owner_user_id == user.user_id)))
     if owned_clinic_ids:
         db.execute(delete(LabPacket).where(LabPacket.clinic_id.in_(owned_clinic_ids)))
+        db.execute(delete(ClinicInvite).where(ClinicInvite.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(ClinicMember).where(ClinicMember.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(Clinic).where(Clinic.id.in_(owned_clinic_ids)))
     db.execute(delete(ClinicMember).where(ClinicMember.user_id == user.user_id))

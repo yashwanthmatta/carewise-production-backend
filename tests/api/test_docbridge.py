@@ -100,3 +100,38 @@ def test_deleting_account_removes_owned_clinic():
         assert client.delete("/privacy/me", headers=headers).status_code == 200
     with SessionLocal() as db:
         assert db.scalars(select(LabPacket)).all() == []
+
+
+def test_team_roles_reject_audit_and_manual_review():
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        invite = client.post(f"/clinics/{clinic_id}/invites", json={"role": "front_desk"}, headers=owner).json()
+        desk, _ = auth_headers(client)
+        joined = client.post("/clinics/join", json={"code": invite["code"], "display_name": "Sam (front desk)"}, headers=desk)
+        assert joined.status_code == 200 and joined.json()["member_role"] == "front_desk"
+        assert client.post("/clinics/join", json={"code": invite["code"], "display_name": "Again"}, headers=auth_headers(client)[0]).status_code == 404
+        assert client.post(f"/clinics/{clinic_id}/invites", json={}, headers=desk).status_code == 403
+
+        packet = draft(client, desk, clinic_id)
+        assert client.post(f"/clinics/{clinic_id}/packets/{packet['id']}/approve", json={"summary": "x"}, headers=desk).status_code == 403
+        approved = client.post(
+            f"/clinics/{clinic_id}/packets/{packet['id']}/approve",
+            json={"summary": "Your LDL cholesterol is above the usual target.", "questions": []},
+            headers=owner,
+        ).json()
+        assert approved["edited"] is False
+
+        unreadable = client.post(
+            f"/clinics/{clinic_id}/packets",
+            json={"patient_ref": "B2", "markers": [], "summary": "", "deidentified_confirmed": True},
+            headers=desk,
+        ).json()
+        assert unreadable["status"] == "manual_review"
+        rejected = client.post(f"/clinics/{clinic_id}/packets/{unreadable['id']}/reject", headers=owner)
+        assert rejected.json()["status"] == "rejected"
+
+        trail = client.get(f"/clinics/{clinic_id}/packets/{packet['id']}/audit", headers=owner).json()
+        assert [step["action"] for step in trail] == ["Draft created", "Approved and patient link created"]
+        assert trail[0]["who"] == "Sam (front desk)" and trail[1]["who"] == "Dr. Lee"
+        members = client.get(f"/clinics/{clinic_id}/members", headers=owner).json()
+        assert [m["role"] for m in members] == ["owner", "front_desk"]

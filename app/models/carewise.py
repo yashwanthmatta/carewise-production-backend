@@ -19,6 +19,12 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(40), index=True, default="patient")
     email_verified: Mapped[str] = mapped_column(String(10), index=True, default="false")
+    # Two-step sign-in: the authenticator secret (encrypted), whether it is on, the last
+    # code step used (so a code works once), and hashes of one-time recovery codes.
+    encrypted_totp_secret: Mapped[str] = mapped_column(Text, default="")
+    totp_enabled: Mapped[int] = mapped_column(Integer, default=0)
+    totp_last_step: Mapped[int] = mapped_column(Integer, default=0)
+    recovery_code_hashes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     patient_profile: Mapped["PatientProfile"] = relationship(back_populates="user")

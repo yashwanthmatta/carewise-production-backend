@@ -1,3 +1,7 @@
+import hashlib
+import hmac
+import json
+import time
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -18,6 +22,7 @@ from app.core.security import (
     hash_reset_token,
     verify_password,
 )
+from app.core.crypto import decrypt_field, encrypt_field
 from app.db.session import get_db
 from app.models.carewise import EmailVerificationToken, PasswordResetToken, RefreshToken, User
 from app.schemas.carewise import (
@@ -30,9 +35,13 @@ from app.schemas.carewise import (
     RefreshTokenIn,
     SignupRequest,
     TokenResponse,
+    TwoFactorCodeIn,
+    TwoFactorEnabledOut,
+    TwoFactorLoginIn,
+    TwoFactorSetupOut,
     UserSessionOut,
 )
-from app.services import email_delivery
+from app.services import email_delivery, totp
 from app.services.audit import write_audit
 from app.services.rate_limit import check_rate_limit
 
@@ -72,10 +81,115 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid login.")
+    if user.totp_enabled:
+        db.commit()
+        return TokenResponse(access_token="", two_factor_required=True, challenge=make_challenge(user.id))
     write_audit(db, user.id, "", "user_login", "user", user.id, {})
     token_response = issue_token_pair(db, user)
     db.commit()
     return token_response
+
+
+# ----- Two-step sign-in -----------------------------------------------------------
+CHALLENGE_SECONDS = 300
+
+
+def make_challenge(user_id: str) -> str:
+    expires = int(time.time()) + CHALLENGE_SECONDS
+    body = f"{user_id}.{expires}"
+    signature = hmac.new(settings.jwt_secret.encode(), f"2fa:{body}".encode(), hashlib.sha256).hexdigest()
+    return f"{body}.{signature}"
+
+
+def read_challenge(challenge: str) -> str | None:
+    try:
+        user_id, expires, signature = challenge.rsplit(".", 2)
+    except ValueError:
+        return None
+    expected = hmac.new(settings.jwt_secret.encode(), f"2fa:{user_id}.{expires}".encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature) or not expires.isdigit() or int(expires) < time.time():
+        return None
+    return user_id
+
+
+def use_second_factor(user: User, code: str) -> bool:
+    """Accept a fresh authenticator code, or a one-time recovery code (which is then spent)."""
+    secret = decrypt_field(user.encrypted_totp_secret) if user.encrypted_totp_secret else ""
+    step = totp.matching_step(secret, code) if secret else None
+    if step is not None and step > (user.totp_last_step or 0):
+        user.totp_last_step = step
+        return True
+    hashes = json.loads(user.recovery_code_hashes or "[]")
+    wanted = totp.hash_recovery_code(code)
+    if wanted in hashes:
+        hashes.remove(wanted)
+        user.recovery_code_hashes = json.dumps(hashes)
+        return True
+    return False
+
+
+@router.post("/login/two-factor", response_model=TokenResponse)
+def login_two_factor(payload: TwoFactorLoginIn, request: Request, db: Session = Depends(get_db)):
+    user_id = read_challenge(payload.challenge)
+    check_rate_limit(db, request, "auth_two_factor", user_id or "unknown")
+    user = db.get(User, user_id) if user_id else None
+    if user is None or not user.totp_enabled:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in again.")
+    if not use_second_factor(user, payload.code):
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="That code didn't work.")
+    write_audit(db, user.id, "", "user_login", "user", user.id, {"two_factor": True})
+    token_response = issue_token_pair(db, user)
+    db.commit()
+    return token_response
+
+
+@router.post("/two-factor/setup", response_model=TwoFactorSetupOut)
+def two_factor_setup(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    account = db.get(User, user.user_id)
+    if account.totp_enabled:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Two-step sign-in is already on.")
+    secret = totp.new_secret()
+    account.encrypted_totp_secret = encrypt_field(secret)
+    account.totp_last_step = 0
+    db.commit()
+    return TwoFactorSetupOut(secret=secret, otpauth_url=totp.otpauth_url(secret, account.email))
+
+
+@router.post("/two-factor/enable", response_model=TwoFactorEnabledOut)
+def two_factor_enable(
+    payload: TwoFactorCodeIn, request: Request, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    check_rate_limit(db, request, "auth_two_factor", user.user_id)
+    account = db.get(User, user.user_id)
+    secret = decrypt_field(account.encrypted_totp_secret) if account.encrypted_totp_secret else ""
+    step = totp.matching_step(secret, payload.code) if secret else None
+    if account.totp_enabled or step is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That code didn't work. Check the time on your phone and try again.")
+    codes = totp.new_recovery_codes()
+    account.totp_enabled = 1
+    account.totp_last_step = step
+    account.recovery_code_hashes = json.dumps([totp.hash_recovery_code(code) for code in codes])
+    write_audit(db, user.user_id, "", "two_factor_enabled", "user", user.user_id, {})
+    db.commit()
+    return TwoFactorEnabledOut(enabled=True, recovery_codes=codes)
+
+
+@router.post("/two-factor/disable", response_model=TwoFactorEnabledOut)
+def two_factor_disable(
+    payload: TwoFactorCodeIn, request: Request, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    check_rate_limit(db, request, "auth_two_factor", user.user_id)
+    account = db.get(User, user.user_id)
+    if not account.totp_enabled or not use_second_factor(account, payload.code):
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That code didn't work.")
+    account.totp_enabled = 0
+    account.encrypted_totp_secret = ""
+    account.recovery_code_hashes = ""
+    write_audit(db, user.user_id, "", "two_factor_disabled", "user", user.user_id, {})
+    db.commit()
+    return TwoFactorEnabledOut(enabled=False)
 
 
 @router.get("/me", response_model=UserSessionOut)
@@ -86,6 +200,7 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
         email=user.email,
         role=user.role,
         email_verified=account.email_verified == "true" if account else False,
+        two_factor_enabled=bool(account.totp_enabled) if account else False,
     )
 
 
@@ -219,6 +334,9 @@ def confirm_password_reset(payload: PasswordResetConfirmIn, request: Request, db
     reset_record.status = "used"
     reset_record.used_at = datetime.now(timezone.utc)
     write_audit(db, user.id, "", "password_reset_completed", "user", user.id, {})
+    if user.totp_enabled:
+        db.commit()
+        return TokenResponse(access_token="", two_factor_required=True, challenge=make_challenge(user.id))
     token_response = issue_token_pair(db, user)
     db.commit()
     return token_response

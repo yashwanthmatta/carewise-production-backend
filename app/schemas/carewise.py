@@ -43,6 +43,29 @@ class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str = ""
     token_type: str = "bearer"
+    # When two-step sign-in is on, login returns no tokens yet, only a short-lived
+    # challenge to send back with the authenticator code.
+    two_factor_required: bool = False
+    challenge: str = ""
+
+
+class TwoFactorLoginIn(BaseModel):
+    challenge: str = Field(min_length=10, max_length=300)
+    code: str = Field(min_length=6, max_length=20)
+
+
+class TwoFactorCodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=20)
+
+
+class TwoFactorSetupOut(BaseModel):
+    secret: str
+    otpauth_url: str
+
+
+class TwoFactorEnabledOut(BaseModel):
+    enabled: bool
+    recovery_codes: list[str] = []
 
 
 class RefreshTokenIn(BaseModel):
@@ -54,6 +77,7 @@ class UserSessionOut(BaseModel):
     email: EmailStr
     role: str
     email_verified: bool
+    two_factor_enabled: bool = False
 
 
 class PatientProfileIn(BaseModel):

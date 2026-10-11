@@ -425,6 +425,12 @@ class ClinicInviteIn(BaseModel):
     role: str = Field(default="clinician", pattern="^(clinician|front_desk)$")
 
 
+class ClinicSettingsIn(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+    tone: str = Field(default="friendly", pattern="^(friendly|formal)$")
+    retention_days: int = Field(default=90, ge=30, le=365)
+
+
 class ClinicMemberRoleIn(BaseModel):
     role: str = Field(pattern="^(clinician|front_desk)$")
 

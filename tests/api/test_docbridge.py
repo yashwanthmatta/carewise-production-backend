@@ -135,3 +135,63 @@ def test_team_roles_reject_audit_and_manual_review():
         assert trail[0]["who"] == "Sam (front desk)" and trail[1]["who"] == "Dr. Lee"
         members = client.get(f"/clinics/{clinic_id}/members", headers=owner).json()
         assert [m["role"] for m in members] == ["owner", "front_desk"]
+
+
+def test_owner_manages_team_and_removed_people_lose_access():
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        invite = client.post(f"/clinics/{clinic_id}/invites", json={"role": "clinician"}, headers=owner).json()
+        doc, _ = auth_headers(client)
+        client.post("/clinics/join", json={"code": invite["code"], "display_name": "Dr. Shah"}, headers=doc)
+        packet = draft(client, doc, clinic_id)
+        members = client.get(f"/clinics/{clinic_id}/members", headers=owner).json()
+        shah = next(m for m in members if m["name"] == "Dr. Shah")
+        me = next(m for m in members if m["you"])
+
+        assert client.put(f"/clinics/{clinic_id}/members/{shah['id']}", json={"role": "front_desk"}, headers=doc).status_code == 403
+        assert client.put(f"/clinics/{clinic_id}/members/{me['id']}", json={"role": "front_desk"}, headers=owner).status_code == 409
+        changed = client.put(f"/clinics/{clinic_id}/members/{shah['id']}", json={"role": "front_desk"}, headers=owner)
+        assert changed.json()["role"] == "front_desk"
+        assert client.post(f"/clinics/{clinic_id}/packets/{packet['id']}/approve", json={"summary": "x"}, headers=doc).status_code == 403
+
+        assert client.delete(f"/clinics/{clinic_id}/members/{shah['id']}", headers=owner).json()["status"] == "removed"
+        assert client.get(f"/clinics/{clinic_id}/packets", headers=doc).status_code == 404
+        trail = client.get(f"/clinics/{clinic_id}/packets/{packet['id']}/audit", headers=owner).json()
+        assert trail[0]["who"] == "Former team member"
+        assert client.post(f"/clinics/{clinic_id}/leave", headers=owner).status_code == 409
+
+
+def test_every_clinic_route_is_closed_to_other_clinics():
+    with TestClient(create_app()) as client:
+        headers, clinic_id = make_clinic(client)
+        packet = draft(client, headers, clinic_id)
+        member_id = client.get(f"/clinics/{clinic_id}/members", headers=headers).json()[0]["id"]
+        outsider, _ = make_clinic(client)
+        stranger, _ = auth_headers(client)
+        pid = packet["id"]
+        calls = [
+            ("get", f"/clinics/{clinic_id}/packets", None),
+            ("put", f"/clinics/{clinic_id}/packets/{pid}", {"summary": "x", "questions": []}),
+            ("post", f"/clinics/{clinic_id}/packets/{pid}/approve", {"summary": "x"}),
+            ("post", f"/clinics/{clinic_id}/packets/{pid}/follow-up", {}),
+            ("post", f"/clinics/{clinic_id}/packets/{pid}/reject", None),
+            ("get", f"/clinics/{clinic_id}/packets/{pid}/audit", None),
+            ("post", f"/clinics/{clinic_id}/invites", {"role": "clinician"}),
+            ("get", f"/clinics/{clinic_id}/members", None),
+            ("put", f"/clinics/{clinic_id}/members/{member_id}", {"role": "clinician"}),
+            ("delete", f"/clinics/{clinic_id}/members/{member_id}", None),
+            ("get", f"/clinics/{clinic_id}/patients/JD-1042/summary", None),
+            ("get", f"/clinics/{clinic_id}/metrics", None),
+            ("post", f"/clinics/{clinic_id}/leave", None),
+        ]
+        for who in (outsider, stranger):
+            for method, path, body in calls:
+                kwargs = {"headers": who}
+                if body is not None:
+                    kwargs["json"] = body
+                response = getattr(client, method)(path, **kwargs)
+                assert response.status_code == 404, (method, path, response.status_code)
+        for method, path, body in calls:
+            response = getattr(client, method)(path, **({"json": body} if body is not None else {}))
+            assert response.status_code in (401, 403), (method, path, response.status_code)
+        assert client.get(f"/clinics/{clinic_id}/packets", headers=headers).json()[0]["status"] == "draft"

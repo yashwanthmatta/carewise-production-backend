@@ -16,6 +16,7 @@ from app.schemas.carewise import (
     ClinicIn,
     ClinicInviteIn,
     ClinicJoinIn,
+    ClinicMemberRoleIn,
     ClinicOut,
     LabPacketApprovedOut,
     LabPacketEditIn,
@@ -318,7 +319,54 @@ def join_clinic(payload: ClinicJoinIn, user: CurrentUser = Depends(get_current_u
 def list_members(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     membership(db, user, clinic_id)
     members = db.scalars(select(ClinicMember).where(ClinicMember.clinic_id == clinic_id).order_by(ClinicMember.created_at)).all()
-    return [{"name": m.display_name, "role": m.role} for m in members]
+    return [{"id": m.id, "name": m.display_name, "role": m.role, "you": m.user_id == user.user_id} for m in members]
+
+
+def owner_and_target(db: Session, user: CurrentUser, clinic_id: str, member_id: str) -> ClinicMember:
+    _, me = membership(db, user, clinic_id)
+    if me.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the clinic owner can manage the team.")
+    target = db.get(ClinicMember, member_id)
+    if target is None or target.clinic_id != clinic_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Team member not found.")
+    if target.id == me.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The owner's own role can't be changed here.")
+    return target
+
+
+# The owner changes what a team member may do (approve as a clinician, or prepare
+# drafts only at the front desk), or removes them. Their past steps stay in the audit trail.
+@router.put("/{clinic_id}/members/{member_id}")
+def change_member_role(
+    clinic_id: str, member_id: str, payload: ClinicMemberRoleIn,
+    user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    target = owner_and_target(db, user, clinic_id, member_id)
+    previous = target.role
+    target.role = payload.role
+    write_audit(db, user.user_id, "", "clinic_member_role_changed", "clinic", clinic_id, {"from": previous, "to": payload.role})
+    db.commit()
+    return {"id": target.id, "name": target.display_name, "role": target.role, "you": False}
+
+
+@router.delete("/{clinic_id}/members/{member_id}")
+def remove_member(clinic_id: str, member_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    target = owner_and_target(db, user, clinic_id, member_id)
+    db.delete(target)
+    write_audit(db, user.user_id, "", "clinic_member_removed", "clinic", clinic_id, {"role": target.role})
+    db.commit()
+    return {"status": "removed"}
+
+
+@router.post("/{clinic_id}/leave")
+def leave_clinic(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    _, me = membership(db, user, clinic_id)
+    if me.role == "owner":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="The owner can't leave the clinic.")
+    db.delete(me)
+    write_audit(db, user.user_id, "", "clinic_member_left", "clinic", clinic_id, {"role": me.role})
+    db.commit()
+    return {"status": "left"}
 
 
 # Visit-ready summary: every packet for one patient, with what changed between labs.

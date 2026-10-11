@@ -16,6 +16,7 @@ from app.api.routes import (
     health,
     insurance,
     lab_trends,
+    maintenance,
     mvp,
     notifications,
     patients,
@@ -50,6 +51,7 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        expose_headers=["Content-Disposition"],
     )
     configure_telemetry(app)
 
@@ -89,6 +91,7 @@ def create_app() -> FastAPI:
     app.include_router(shares.router, prefix="/shares", tags=["shares"])
     app.include_router(clinics.router, prefix="/clinics", tags=["docbridge"])
     app.include_router(reminders.router, prefix="/reminders", tags=["reminders"])
+    app.include_router(maintenance.router, prefix="/maintenance", tags=["maintenance"])
 
     @app.on_event("startup")
     def startup() -> None:

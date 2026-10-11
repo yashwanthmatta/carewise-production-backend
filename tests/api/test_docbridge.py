@@ -195,3 +195,51 @@ def test_every_clinic_route_is_closed_to_other_clinics():
             response = getattr(client, method)(path, **({"json": body} if body is not None else {}))
             assert response.status_code in (401, 403), (method, path, response.status_code)
         assert client.get(f"/clinics/{clinic_id}/packets", headers=headers).json()[0]["status"] == "draft"
+
+
+def test_owner_settings_and_audit_download_without_lab_values():
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        packet = draft(client, owner, clinic_id)
+        bad = client.put(f"/clinics/{clinic_id}/settings", json={"name": "Maple", "tone": "formal", "retention_days": 45}, headers=owner)
+        assert bad.status_code == 422
+        saved = client.put(f"/clinics/{clinic_id}/settings", json={"name": "Maple Health", "tone": "formal", "retention_days": 30}, headers=owner)
+        assert saved.json()["name"] == "Maple Health" and saved.json()["retention_days"] == 30 and saved.json()["tone"] == "formal"
+
+        invite = client.post(f"/clinics/{clinic_id}/invites", json={"role": "front_desk"}, headers=owner).json()
+        desk, _ = auth_headers(client)
+        client.post("/clinics/join", json={"code": invite["code"], "display_name": "Sam"}, headers=desk)
+        assert client.put(f"/clinics/{clinic_id}/settings", json={"name": "X Y", "tone": "formal", "retention_days": 30}, headers=desk).status_code == 403
+        assert client.get(f"/clinics/{clinic_id}/audit.csv", headers=desk).status_code == 403
+
+        csv_response = client.get(f"/clinics/{clinic_id}/audit.csv", headers=owner)
+        assert csv_response.status_code == 200 and csv_response.headers["content-type"].startswith("text/csv")
+        assert "Maple-Health-docbridge-audit.csv" in csv_response.headers["content-disposition"]
+        body = csv_response.text
+        assert "Draft created" in body and "Clinic settings changed" in body and "Joined the clinic" in body
+        assert f"Lab {packet['id'][-8:]}" in body
+        assert "LDL" not in body and "148" not in body
+
+
+def test_nightly_purge_deletes_old_labs_but_keeps_the_log(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    from app.api.routes.maintenance import run_purge
+    from app.core.config import settings
+
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        old = draft(client, owner, clinic_id, ref="OLD-1")
+        fresh = draft(client, owner, clinic_id, ref="NEW-1")
+        assert client.post("/maintenance/purge").status_code == 403
+    with SessionLocal() as db:
+        db.get(LabPacket, old["id"]).created_at = datetime.now(timezone.utc) - timedelta(days=120)
+        db.commit()
+        counts = run_purge(db, datetime.now(timezone.utc))
+        assert counts["lab_packets"] == 1
+        assert db.get(LabPacket, old["id"]) is None and db.get(LabPacket, fresh["id"]) is not None
+    monkeypatch.setattr(settings, "reminder_cron_token", "cron-secret")
+    with TestClient(create_app()) as client:
+        assert client.post("/maintenance/purge", headers={"X-CareWise-Cron-Token": "cron-secret"}).json()["lab_packets"] == 0
+        log = client.get(f"/clinics/{clinic_id}/audit.csv", headers=owner).text
+        assert f"Lab {old['id'][-8:]}" in log and "Old labs deleted (retention)" in log and "CareWise (automatic)" in log

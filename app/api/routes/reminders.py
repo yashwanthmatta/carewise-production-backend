@@ -6,7 +6,7 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
@@ -18,6 +18,7 @@ from app.db.session import get_db
 from app.models.carewise import MedicineReminder, ReminderEvent, User
 from app.schemas.carewise import ReminderIn, ReminderOut, ReminderTakenIn
 from app.services import reminder_calls
+from app.services.cron_auth import require_cron_token
 from app.services.email_delivery import base_message, send_email
 from app.services.rate_limit import check_rate_limit
 
@@ -349,14 +350,8 @@ def run_dispatch(db: Session, now: datetime) -> dict:
     return counts
 
 
-@router.post("/dispatch")
-def dispatch(
-    x_carewise_cron_token: str = Header(default=""),
-    db: Session = Depends(get_db),
-):
-    expected = settings.clean_env_value(settings.reminder_cron_token)
-    if not expected or not hmac.compare_digest(expected, x_carewise_cron_token):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed.")
+@router.post("/dispatch", dependencies=[Depends(require_cron_token)])
+def dispatch(db: Session = Depends(get_db)):
     return run_dispatch(db, datetime.now(timezone.utc))
 
 

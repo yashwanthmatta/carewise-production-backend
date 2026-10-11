@@ -1,0 +1,31 @@
+name: Scheduled Jobs
+
+# Reminder calls every 5 minutes and a nightly cleanup of data past its retention
+# period. Both endpoints need the CAREWISE_REMINDER_CRON_TOKEN secret, which must
+# match the same variable on the Render API service.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "dispatch or purge"
+        required: true
+        default: dispatch
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the API
+        env:
+          TOKEN: ${{ secrets.CAREWISE_REMINDER_CRON_TOKEN }}
+          API: https://carewise-api.onrender.com
+          JOB: ${{ github.event.schedule == '17 7 * * *' && 'purge' || inputs.job || 'dispatch' }}
+        run: |
+          if [ -z "$TOKEN" ]; then echo "CAREWISE_REMINDER_CRON_TOKEN is not set; skipping."; exit 0; fi
+          if [ "$JOB" = "purge" ]; then path=/maintenance/purge; else path=/reminders/dispatch; fi
+          curl --silent --show-error --fail --max-time 120 --retry 2 -X POST \
+            -H "X-CareWise-Cron-Token: $TOKEN" "$API$path"

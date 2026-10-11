@@ -1,11 +1,13 @@
+import csv
 import hashlib
+import io
 import json
 import secrets
 import statistics
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.crypto import decrypt_field, encrypt_field
@@ -17,6 +19,7 @@ from app.schemas.carewise import (
     ClinicInviteIn,
     ClinicJoinIn,
     ClinicMemberRoleIn,
+    ClinicSettingsIn,
     ClinicOut,
     LabPacketApprovedOut,
     LabPacketEditIn,
@@ -159,7 +162,7 @@ def create_packet(
     )
     db.add(packet)
     db.flush()
-    write_audit(db, user.user_id, "", "packet_drafted", "lab_packet", packet.id, {"markers": len(payload.markers)})
+    write_audit(db, user.user_id, "", "packet_drafted", "lab_packet", packet.id, {"markers": len(payload.markers), "clinic_id": clinic_id})
     db.commit()
     db.refresh(packet)
     return packet_out(packet)
@@ -189,7 +192,7 @@ def edit_packet(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approved or rejected packets can't be edited.")
     packet.encrypted_summary = encrypt_field(payload.summary.strip())
     packet.encrypted_questions = encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()]))
-    write_audit(db, user.user_id, "", "packet_edited", "lab_packet", packet.id, {})
+    write_audit(db, user.user_id, "", "packet_edited", "lab_packet", packet.id, {"clinic_id": clinic_id})
     db.commit()
     db.refresh(packet)
     return packet_out(packet)
@@ -224,7 +227,7 @@ def approve_packet(
     packet.expires_at = now + timedelta(days=PATIENT_LINK_DAYS)
     write_audit(
         db, user.user_id, "", "packet_approved", "lab_packet", packet.id,
-        {"review_seconds": packet.review_seconds, "edited": bool(packet.edited), "by": member.display_name},
+        {"review_seconds": packet.review_seconds, "edited": bool(packet.edited), "by": member.display_name, "clinic_id": clinic_id},
     )
     db.commit()
     db.refresh(packet)
@@ -237,7 +240,7 @@ def mark_follow_up(clinic_id: str, packet_id: str, user: CurrentUser = Depends(g
     packet = clinic_packet(db, clinic_id, packet_id)
     if packet.status not in CLOSED_STATUSES:
         packet.status = "needs_call"
-    write_audit(db, user.user_id, "", "packet_needs_call", "lab_packet", packet.id, {})
+    write_audit(db, user.user_id, "", "packet_needs_call", "lab_packet", packet.id, {"clinic_id": clinic_id})
     db.commit()
     db.refresh(packet)
     return packet_out(packet)
@@ -251,7 +254,7 @@ def reject_packet(clinic_id: str, packet_id: str, user: CurrentUser = Depends(ge
     if packet.status == "approved":
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approved packets can't be rejected.")
     packet.status = "rejected"
-    write_audit(db, user.user_id, "", "packet_rejected", "lab_packet", packet.id, {"by": member.display_name})
+    write_audit(db, user.user_id, "", "packet_rejected", "lab_packet", packet.id, {"by": member.display_name, "clinic_id": clinic_id})
     db.commit()
     db.refresh(packet)
     return packet_out(packet)
@@ -264,7 +267,18 @@ ACTION_LABELS = {
     "packet_needs_call": "Marked as needs a follow-up call",
     "packet_rejected": "Rejected, not sent",
     "packet_viewed_by_patient": "Opened by the patient",
+    "clinic_created": "Clinic created",
+    "clinic_settings_changed": "Clinic settings changed",
+    "clinic_invite_created": "Invite code created",
+    "clinic_joined": "Joined the clinic",
+    "clinic_member_role_changed": "Team member role changed",
+    "clinic_member_removed": "Team member removed",
+    "clinic_member_left": "Left the clinic",
+    "visit_summary_viewed": "Visit summary opened",
+    "audit_exported": "Audit log downloaded",
+    "retention_purge": "Old labs deleted (retention)",
 }
+RETENTION_CHOICES = {30, 60, 90, 180, 365}
 
 
 @router.get("/{clinic_id}/packets/{packet_id}/audit")
@@ -283,6 +297,67 @@ def packet_audit(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get
         }
         for event in events
     ]
+
+
+@router.put("/{clinic_id}/settings", response_model=ClinicOut)
+def update_settings(
+    clinic_id: str, payload: ClinicSettingsIn, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    clinic, member = membership(db, user, clinic_id)
+    if member.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the clinic owner can change settings.")
+    if payload.retention_days not in RETENTION_CHOICES:
+        raise HTTPException(status_code=422, detail="Choose 30, 60, 90, 180 or 365 days.")
+    changes = {
+        key: value
+        for key, value in (("name", payload.name.strip()), ("tone", payload.tone), ("retention_days", payload.retention_days))
+        if getattr(clinic, key) != value
+    }
+    for key, value in changes.items():
+        setattr(clinic, key, value)
+    if changes:
+        write_audit(db, user.user_id, "", "clinic_settings_changed", "clinic", clinic_id, {k: v for k, v in changes.items() if k != "name"})
+    db.commit()
+    return clinic_out(clinic, member)
+
+
+# The clinic's full activity log as a spreadsheet, for its own compliance records.
+# It lists who did what and when; it never includes lab values or explanations.
+@router.get("/{clinic_id}/audit.csv")
+def export_audit(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    clinic, member = membership(db, user, clinic_id)
+    if member.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the clinic owner can download the log.")
+    write_audit(db, user.user_id, "", "audit_exported", "clinic", clinic_id, {})
+    db.commit()
+    names = {m.user_id: m.display_name for m in db.scalars(select(ClinicMember).where(ClinicMember.clinic_id == clinic_id))}
+    packet_ids = list(db.scalars(select(LabPacket.id).where(LabPacket.clinic_id == clinic_id)))
+    tag = f'"clinic_id": "{clinic_id}"'
+    events = db.scalars(
+        select(AuditEvent)
+        .where(
+            or_(
+                (AuditEvent.resource_type == "clinic") & (AuditEvent.resource_id == clinic_id),
+                (AuditEvent.resource_type == "lab_packet") & AuditEvent.resource_id.in_(packet_ids or [""]),
+                (AuditEvent.resource_type == "lab_packet") & AuditEvent.metadata_json.contains(tag),
+            )
+        )
+        .order_by(AuditEvent.created_at)
+    ).all()
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["When (UTC)", "Who", "What", "Record"])
+    for event in events:
+        who = "Patient" if event.actor_id == "patient_link" else "CareWise (automatic)" if event.actor_id == "system" else names.get(event.actor_id, "Former team member")
+        record = f"Lab {event.resource_id[-8:]}" if event.resource_type == "lab_packet" else "Clinic"
+        when = (as_utc(event.created_at) or datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M")
+        writer.writerow([when, who, ACTION_LABELS.get(event.action, event.action), record])
+    safe = "".join(ch for ch in clinic.name if ch.isalnum() or ch in " -")[:40].strip().replace(" ", "-") or "clinic"
+    return Response(
+        content=out.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{safe}-docbridge-audit.csv"'},
+    )
 
 
 @router.post("/{clinic_id}/invites")
@@ -419,7 +494,7 @@ def view_packet(payload: PacketViewIn, request: Request, db: Session = Depends(g
     clinic = db.get(Clinic, packet.clinic_id)
     if packet.patient_viewed_at is None:
         packet.patient_viewed_at = now
-    write_audit(db, "patient_link", "", "packet_viewed_by_patient", "lab_packet", packet.id, {})
+    write_audit(db, "patient_link", "", "packet_viewed_by_patient", "lab_packet", packet.id, {"clinic_id": packet.clinic_id})
     db.commit()
     data = packet_out(packet)
     return {

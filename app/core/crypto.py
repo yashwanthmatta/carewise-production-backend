@@ -28,3 +28,11 @@ def decrypt_field(value: str | None) -> str:
         return _fernet().decrypt(value.encode("utf-8")).decode("utf-8")
     except InvalidToken:
         return "[unreadable encrypted field]"
+
+
+def encrypt_bytes(value: bytes) -> bytes:
+    return _fernet().encrypt(value)
+
+
+def decrypt_bytes(value: bytes) -> bytes:
+    return _fernet().decrypt(value)

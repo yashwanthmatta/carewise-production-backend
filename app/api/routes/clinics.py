@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.crypto import decrypt_field, encrypt_field
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
@@ -93,6 +94,7 @@ def packet_out(packet: LabPacket) -> dict:
         "review_seconds": packet.review_seconds,
         "patient_viewed": packet.patient_viewed_at is not None,
         "edited": None if packet.edited is None else bool(packet.edited),
+        "source": packet.source or "manual",
         "created_at": packet.created_at,
     }
 
@@ -102,8 +104,19 @@ def require_approver(member: ClinicMember) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only a clinician can approve or reject.")
 
 
+def intake_address(clinic: Clinic) -> str:
+    domain = settings.clean_env_value(settings.inbound_email_domain)
+    return f"labs+{clinic.intake_code}@{domain}" if domain and clinic.intake_code else ""
+
+
+def ensure_intake_code(clinic: Clinic) -> None:
+    if not clinic.intake_code:
+        clinic.intake_code = secrets.token_hex(6)
+
+
 def clinic_out(clinic: Clinic, member: ClinicMember) -> dict:
     return {
+        "intake_address": intake_address(clinic),
         "id": clinic.id,
         "name": clinic.name,
         "tone": clinic.tone,
@@ -118,6 +131,7 @@ def create_clinic(payload: ClinicIn, user: CurrentUser = Depends(get_current_use
     if db.scalar(select(ClinicMember).where(ClinicMember.user_id == user.user_id)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account already belongs to a clinic.")
     clinic = Clinic(name=payload.name.strip(), tone=payload.tone, owner_user_id=user.user_id, retention_days=90)
+    ensure_intake_code(clinic)
     db.add(clinic)
     db.flush()
     member = ClinicMember(clinic_id=clinic.id, user_id=user.user_id, display_name=payload.clinician_name.strip(), role="owner")
@@ -133,6 +147,9 @@ def my_clinic(user: CurrentUser = Depends(get_current_user), db: Session = Depen
     clinic = db.get(Clinic, member.clinic_id) if member else None
     if member is None or clinic is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No clinic yet.")
+    if not clinic.intake_code:
+        ensure_intake_code(clinic)
+        db.commit()
     return clinic_out(clinic, member)
 
 
@@ -190,9 +207,19 @@ def edit_packet(
     packet = clinic_packet(db, clinic_id, packet_id)
     if packet.status in CLOSED_STATUSES:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Approved or rejected packets can't be edited.")
+    first_draft = packet.status == "new"
+    if payload.markers is not None and (first_draft or not packet.encrypted_markers):
+        packet.encrypted_markers = encrypt_field(json.dumps([m.model_dump() for m in payload.markers]))
+    if payload.lab_date is not None and not packet.lab_date:
+        packet.lab_date = payload.lab_date
     packet.encrypted_summary = encrypt_field(payload.summary.strip())
     packet.encrypted_questions = encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()]))
-    write_audit(db, user.user_id, "", "packet_edited", "lab_packet", packet.id, {"clinic_id": clinic_id})
+    if first_draft:
+        # The first draft of an emailed lab, made on the clinician's screen; approval
+        # later compares against it to record whether the clinician edited it.
+        packet.status = "draft" if payload.markers else "manual_review"
+        packet.encrypted_draft = packet.encrypted_summary
+    write_audit(db, user.user_id, "", "packet_drafted" if first_draft else "packet_edited", "lab_packet", packet.id, {"clinic_id": clinic_id})
     db.commit()
     db.refresh(packet)
     return packet_out(packet)
@@ -213,6 +240,8 @@ def approve_packet(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Already approved or rejected.")
     if not payload.summary.strip():
         raise HTTPException(status_code=422, detail="Add the patient explanation before approving.")
+    if packet.status == "new":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Open the emailed lab to draft it before approving.")
     now = datetime.now(timezone.utc)
     token = secrets.token_urlsafe(32)
     packet.edited = int(payload.summary.strip() != decrypt_field(packet.encrypted_draft).strip())
@@ -260,6 +289,14 @@ def reject_packet(clinic_id: str, packet_id: str, user: CurrentUser = Depends(ge
     return packet_out(packet)
 
 
+@router.get("/{clinic_id}/packets/{packet_id}/source")
+def packet_source(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    # The text read from an emailed lab PDF, so the clinician's screen can run the lab parser.
+    membership(db, user, clinic_id)
+    packet = clinic_packet(db, clinic_id, packet_id)
+    return {"text": decrypt_field(packet.encrypted_source_text) if packet.encrypted_source_text else ""}
+
+
 ACTION_LABELS = {
     "packet_drafted": "Draft created",
     "packet_edited": "Draft edited",
@@ -267,6 +304,10 @@ ACTION_LABELS = {
     "packet_needs_call": "Marked as needs a follow-up call",
     "packet_rejected": "Rejected, not sent",
     "packet_viewed_by_patient": "Opened by the patient",
+    "packet_received_by_email": "Received by email",
+    "intake_rejected_sender": "Email ignored: sender not on the team",
+    "intake_rejected_not_deidentified": "Email ignored: DEID missing from subject",
+    "intake_no_pdf": "Email ignored: no PDF attached",
     "clinic_created": "Clinic created",
     "clinic_settings_changed": "Clinic settings changed",
     "clinic_invite_created": "Invite code created",

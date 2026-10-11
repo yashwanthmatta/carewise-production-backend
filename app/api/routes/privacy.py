@@ -261,6 +261,11 @@ def delete_my_account_data(
         db.execute(delete(MedicineReminder).where(MedicineReminder.id.in_(reminder_ids)))
     owned_clinic_ids = list(db.scalars(select(Clinic.id).where(Clinic.owner_user_id == user.user_id)))
     if owned_clinic_ids:
+        for key in db.scalars(select(LabPacket.file_key).where(LabPacket.clinic_id.in_(owned_clinic_ids), LabPacket.file_key != "")):
+            try:
+                delete_stored_file(key)
+            except Exception:
+                pass
         db.execute(delete(LabPacket).where(LabPacket.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(ClinicInvite).where(ClinicInvite.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(ClinicMember).where(ClinicMember.clinic_id.in_(owned_clinic_ids)))

@@ -28,14 +28,15 @@ def test_turn_on_sign_in_with_code_and_recovery_then_turn_off():
         assert setup["otpauth_url"].startswith("otpauth://totp/CareWise")
         secret = setup["secret"]
         assert client.post("/auth/two-factor/enable", json={"code": "000000"}, headers=headers).status_code == 400
-        enabled = client.post("/auth/two-factor/enable", json={"code": totp.code_at(secret, totp.current_step())}, headers=headers).json()
+        enable_code = totp.code_at(secret, totp.current_step())
+        enabled = client.post("/auth/two-factor/enable", json={"code": enable_code}, headers=headers).json()
         assert enabled["enabled"] is True and len(enabled["recovery_codes"]) == 8
         assert client.get("/auth/me", headers=headers).json()["two_factor_enabled"] is True
 
         first = client.post("/auth/login", json={"email": email, "password": PASSWORD}).json()
         assert first["two_factor_required"] is True and first["access_token"] == ""
         # The code used to turn it on can't be replayed.
-        replay = client.post("/auth/login/two-factor", json={"challenge": first["challenge"], "code": totp.code_at(secret, totp.current_step())})
+        replay = client.post("/auth/login/two-factor", json={"challenge": first["challenge"], "code": enable_code})
         assert replay.status_code == 401
         assert client.post("/auth/login/two-factor", json={"challenge": "user_x.1.bad", "code": "123456"}).status_code == 401
 

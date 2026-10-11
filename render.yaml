@@ -53,6 +53,10 @@ services:
         value: https://carewise-api.onrender.com
       - key: CAREWISE_REMINDER_CRON_TOKEN
         sync: false
+      - key: CAREWISE_INBOUND_EMAIL_DOMAIN
+        sync: false
+      - key: CAREWISE_INBOUND_EMAIL_TOKEN
+        sync: false
       - key: CAREWISE_STRIPE_SECRET_KEY
         sync: false
       - key: CAREWISE_STRIPE_WEBHOOK_SECRET

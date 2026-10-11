@@ -85,6 +85,10 @@ class Settings(BaseSettings):
     twilio_from_number: str = ""
     public_api_url: str = "https://carewise-api.onrender.com"
     reminder_cron_token: str = ""
+    # DocBridge email intake. Clinics forward lab PDFs to labs+CODE@<inbound_email_domain>;
+    # the email provider posts each message to /inbound/email/<inbound_email_token>.
+    inbound_email_domain: str = ""
+    inbound_email_token: str = ""
     # Founder-only access to feedback counts and early-access sign-ups. Set it in the
     # hosting dashboard; when empty the summary endpoint stays switched off.
     founder_token: str = ""
@@ -141,6 +145,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.env.lower() == "production"
+
+    @property
+    def inbound_email_enabled(self) -> bool:
+        return bool(self.clean_env_value(self.inbound_email_domain) and self.clean_env_value(self.inbound_email_token))
 
     @property
     def reminder_calls_enabled(self) -> bool:

@@ -264,3 +264,24 @@ def delete_stored_file(storage_key: str) -> bool:
     existed = target_path.exists()
     target_path.unlink(missing_ok=True)
     return existed
+
+
+def store_private_bytes(storage_key: str, data: bytes) -> str:
+    """Save already-encrypted bytes (for example an emailed lab PDF) to the configured storage."""
+    temp_path = Path(tempfile.mkstemp(prefix="carewise-private-")[1])
+    try:
+        temp_path.write_bytes(data)
+        if settings.storage_backend.lower() == "s3":
+            return upload_temp_file_to_s3(temp_path, storage_key, "application/octet-stream")
+        return persist_temp_file_locally(temp_path, storage_key)
+    finally:
+        temp_path.unlink(missing_ok=True)
+
+
+def pdf_bytes_to_text(data: bytes) -> str:
+    temp_path = Path(tempfile.mkstemp(prefix="carewise-pdf-")[1])
+    try:
+        temp_path.write_bytes(data)
+        return extract_text_from_pdf(temp_path)
+    finally:
+        temp_path.unlink(missing_ok=True)

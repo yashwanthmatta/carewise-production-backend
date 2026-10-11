@@ -43,6 +43,7 @@ def features():
         "stripe_checkout": bool(settings.clean_env_value(settings.stripe_secret_key)),
         "stripe_webhook": bool(settings.clean_env_value(settings.stripe_webhook_secret)),
         "reminder_calls": settings.reminder_calls_enabled,
+        "inbound_email": settings.inbound_email_enabled,
         "reminder_dispatch": bool(settings.clean_env_value(settings.reminder_cron_token)),
         "password_reset": True,
         "email_delivery": settings.email_delivery_enabled,

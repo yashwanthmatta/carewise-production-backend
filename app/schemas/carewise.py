@@ -425,6 +425,10 @@ class ClinicInviteIn(BaseModel):
     role: str = Field(default="clinician", pattern="^(clinician|front_desk)$")
 
 
+class ClinicMemberRoleIn(BaseModel):
+    role: str = Field(pattern="^(clinician|front_desk)$")
+
+
 class ClinicJoinIn(BaseModel):
     code: str = Field(min_length=8, max_length=40)
     display_name: str = Field(min_length=2, max_length=160)

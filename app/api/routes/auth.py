@@ -59,7 +59,7 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
     if payload.role != "patient" and settings.staff_role_for(payload.email) != payload.role:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Clinician and admin accounts are set up by the CareWise team.",
+            detail="Clinician and admin accounts are set up by the FollowThrough Health team.",
         )
     user = User(
         email=payload.email,

@@ -258,7 +258,7 @@ Index("idx_email_verification_user_created", EmailVerificationToken.user_id, Ema
 Index("idx_rate_limit_action_window", RateLimitBucket.action, RateLimitBucket.window_start.desc())
 
 
-# Product signals for learning whether CareWise helps. None of these tables store
+# Product signals for learning whether FollowThrough Health helps. None of these tables store
 # report text, IP addresses or account ids.
 class UsageCounter(Base):
     __tablename__ = "usage_counters"

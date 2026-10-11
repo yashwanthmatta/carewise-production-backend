@@ -25,7 +25,7 @@ def test_turn_on_sign_in_with_code_and_recovery_then_turn_off():
     with TestClient(create_app()) as client:
         email, headers = signup(client)
         setup = client.post("/auth/two-factor/setup", headers=headers).json()
-        assert setup["otpauth_url"].startswith("otpauth://totp/CareWise")
+        assert setup["otpauth_url"].startswith("otpauth://totp/FollowThrough%20Health")
         secret = setup["secret"]
         assert client.post("/auth/two-factor/enable", json={"code": "000000"}, headers=headers).status_code == 400
         enable_code = totp.code_at(secret, totp.current_step())

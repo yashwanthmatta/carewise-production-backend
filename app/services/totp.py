@@ -42,7 +42,7 @@ def matching_step(secret: str, code: str, now: float | None = None) -> int | Non
     return None
 
 
-def otpauth_url(secret: str, email: str, issuer: str = "CareWise") -> str:
+def otpauth_url(secret: str, email: str, issuer: str = "FollowThrough Health") -> str:
     label = urllib.parse.quote(f"{issuer}:{email}")
     query = urllib.parse.urlencode({"secret": secret, "issuer": issuer, "digits": DIGITS, "period": STEP_SECONDS})
     return f"otpauth://totp/{label}?{query}"

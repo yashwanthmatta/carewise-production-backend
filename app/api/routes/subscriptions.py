@@ -234,7 +234,7 @@ def create_stripe_checkout_session(plan: dict, subscription_id: str, customer_em
         "line_items[0][price_data][currency]": "usd",
         "line_items[0][price_data][unit_amount]": str(int(plan["monthly_price_usd"]) * 100),
         "line_items[0][price_data][recurring][interval]": "month",
-        "line_items[0][price_data][product_data][name]": f"CareWise {plan['name']}",
+        "line_items[0][price_data][product_data][name]": f"FollowThrough Health {plan['name']}",
         "line_items[0][price_data][product_data][metadata][plan_code]": plan["plan_code"],
         "metadata[subscription_id]": subscription_id,
         "metadata[plan_code]": plan["plan_code"],

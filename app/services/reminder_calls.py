@@ -16,9 +16,9 @@ VOICES = {"en": ("Polly.Joanna", "en-US"), "es": ("Polly.Lupe", "es-US")}
 
 SCRIPTS = {
     "en": {
-        "consent": "Hello. This is CareWise. {caller} set up phone calls to remind you when it is time for your medicine. "
+        "consent": "Hello. This is FollowThrough Health. {caller} set up phone calls to remind you when it is time for your medicine. "
         "To agree to these reminder calls, press 1. If you do not want them, press 9.",
-        "dose": "Hello, this is CareWise, with a reminder from {caller}. It is time for your medicine. "
+        "dose": "Hello, this is FollowThrough Health, with a reminder from {caller}. It is time for your medicine. "
         "If you have taken it, press 1. To hear this again, press 2. To stop these calls, press 9.",
         "consent_yes": "Thank you. You will get a call at each reminder time. Goodbye.",
         "taken": "Thank you. We will let {caller} know. Goodbye.",
@@ -28,9 +28,9 @@ SCRIPTS = {
         "family": "your family",
     },
     "es": {
-        "consent": "Hola. Le llama CareWise. {caller} programó llamadas para recordarle cuándo tomar su medicina. "
+        "consent": "Hola. Le llama FollowThrough Health. {caller} programó llamadas para recordarle cuándo tomar su medicina. "
         "Para aceptar estas llamadas, marque 1. Si no las desea, marque 9.",
-        "dose": "Hola, le llama CareWise con un recordatorio de {caller}. Es hora de tomar su medicina. "
+        "dose": "Hola, le llama FollowThrough Health con un recordatorio de {caller}. Es hora de tomar su medicina. "
         "Si ya la tomó, marque 1. Para escuchar de nuevo, marque 2. Para dejar de recibir estas llamadas, marque 9.",
         "consent_yes": "Gracias. Recibirá una llamada a cada hora del recordatorio. Adiós.",
         "taken": "Gracias. Se lo diremos a {caller}. Adiós.",

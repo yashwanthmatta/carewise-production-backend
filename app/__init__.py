@@ -1,1 +1,1 @@
-"""CareWise production backend package."""
+"""FollowThrough Health production backend package."""

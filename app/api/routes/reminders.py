@@ -22,7 +22,7 @@ from app.services.cron_auth import require_cron_token
 from app.services.email_delivery import base_message, send_email
 from app.services.rate_limit import check_rate_limit
 
-# Medicine reminders. Families pick times; CareWise can call the person (after they
+# Medicine reminders. Families pick times; FollowThrough Health can call the person (after they
 # agree on a first call) and email the account owner if a reminder is not confirmed.
 # It is a reminder service, not a medical alert, and it never says what medicine.
 router = APIRouter()
@@ -292,8 +292,8 @@ def alert_missed(db: Session, event: ReminderEvent, reminder: MedicineReminder) 
     person = decrypt_field(reminder.encrypted_person) or "your family member"
     clock = as_utc(event.due_at).astimezone(zone(reminder.timezone)).strftime("%H:%M")
     called = reminder.call_status == "active"
-    message = base_message(owner.email, f"CareWise: the {clock} medicine reminder for {person} was not confirmed")
-    how = "We called twice and nobody pressed 1 to say it was taken." if called else "Nobody marked it as taken in CareWise."
+    message = base_message(owner.email, f"FollowThrough Health: the {clock} medicine reminder for {person} was not confirmed")
+    how = "We called twice and nobody pressed 1 to say it was taken." if called else "Nobody marked it as taken in FollowThrough Health."
     message.set_content(
         f"Hello,\n\nThe {clock} medicine reminder for {person} was not confirmed today. {how}\n\n"
         "You may want to check in with them. This is a reminder service, not a medical alert. "

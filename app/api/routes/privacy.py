@@ -17,6 +17,8 @@ from app.models.carewise import (
     ClinicMember,
     DataDeletionRequest,
     DoctorShare,
+    MedicineReminder,
+    ReminderEvent,
     LabPacket,
     EmailVerificationToken,
     Intake,
@@ -253,6 +255,10 @@ def delete_my_account_data(
     db.execute(delete(NotificationPreference).where(NotificationPreference.user_id == user.user_id))
     db.execute(delete(Subscription).where(Subscription.user_id == user.user_id))
     db.execute(delete(DoctorShare).where(DoctorShare.user_id == user.user_id))
+    reminder_ids = list(db.scalars(select(MedicineReminder.id).where(MedicineReminder.user_id == user.user_id)))
+    if reminder_ids:
+        db.execute(delete(ReminderEvent).where(ReminderEvent.reminder_id.in_(reminder_ids)))
+        db.execute(delete(MedicineReminder).where(MedicineReminder.id.in_(reminder_ids)))
     owned_clinic_ids = list(db.scalars(select(Clinic.id).where(Clinic.owner_user_id == user.user_id)))
     if owned_clinic_ids:
         db.execute(delete(LabPacket).where(LabPacket.clinic_id.in_(owned_clinic_ids)))

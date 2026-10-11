@@ -366,3 +366,45 @@ class ClinicInvite(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class MedicineReminder(Base):
+    # A medicine-time reminder a family sets up for themselves or a parent. Names,
+    # phone number and label are encrypted. Calls only start after the person who
+    # will be called presses 1 on a first "do you agree" call.
+    __tablename__ = "medicine_reminders"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("rem"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    encrypted_person: Mapped[str] = mapped_column(Text, default="")
+    encrypted_label: Mapped[str] = mapped_column(Text, default="")
+    times: Mapped[str] = mapped_column(String(64))
+    days: Mapped[str] = mapped_column(String(40), default="daily")
+    timezone: Mapped[str] = mapped_column(String(64), default="America/New_York")
+    language: Mapped[str] = mapped_column(String(5), default="en")
+    encrypted_phone: Mapped[str] = mapped_column(Text, default="")
+    encrypted_caller_name: Mapped[str] = mapped_column(Text, default="")
+    call_status: Mapped[str] = mapped_column(String(20), default="off")
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    alert_on_miss: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[int] = mapped_column(Integer, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ReminderEvent(Base):
+    # One reminder time on one day (kind "dose"), or the first consent call
+    # (kind "consent"). The phone keypad answer is matched by a token hash.
+    __tablename__ = "reminder_events"
+    __table_args__ = (UniqueConstraint("reminder_id", "kind", "due_at", name="uq_reminder_event"),)
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("rev"))
+    reminder_id: Mapped[str] = mapped_column(ForeignKey("medicine_reminders.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(10), default="dose")
+    due_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(12), default="due", index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    last_call_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -141,6 +141,17 @@ def main() -> int:
         token = signup["access_token"]
         # New accounts start on the Free plan (checks the plans and payments routes are deployed).
         plan = request_json("GET", f"{base_url}/subscriptions/me", token=token)
+        # Medicine reminders: create, mark taken, list and delete (no phone call involved).
+        reminder = request_json(
+            "POST",
+            f"{base_url}/reminders",
+            {"person": "Smoke test", "label": "Smoke", "times": ["08:00"], "timezone": "UTC"},
+            token=token,
+        )
+        request_json("POST", f"{base_url}/reminders/{reminder['id']}/taken", {"time": "08:00"}, token=token)
+        reminders_listed = request_json("GET", f"{base_url}/reminders", token=token)
+        request_json("DELETE", f"{base_url}/reminders/{reminder['id']}", token=token)
+        reminders_check = {"created": bool(reminder["id"]), "taken": reminders_listed[0]["today"][0]["status"] == "taken"}
         if plan.get("plan_code") != "basic":
             raise RuntimeError(f"New account is not on the Free plan: {plan}")
         consent = request_json(
@@ -317,7 +328,10 @@ def main() -> int:
                     "stripe_checkout": features.get("stripe_checkout"),
                     "stripe_webhook": features.get("stripe_webhook"),
                     "help_assistant": features.get("help_assistant"),
+                    "reminder_calls": features.get("reminder_calls"),
+                    "reminder_dispatch": features.get("reminder_dispatch"),
                 },
+                "reminders": reminders_check,
                 "plan": plan.get("plan_name"),
                 "help_assistant": help_assistant,
                 "signup_email": email,

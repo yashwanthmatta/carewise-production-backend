@@ -18,6 +18,7 @@ from app.models.carewise import (
 )
 from app.services.audit import write_audit
 from app.services.cron_auth import require_cron_token
+from app.services.storage import delete_stored_file
 
 # Nightly cleanup run by the scheduler. Deletes what clinics and families should no
 # longer have stored: DocBridge labs past the clinic's retention period, expired doctor
@@ -45,6 +46,8 @@ def run_purge(db: Session, now: datetime) -> dict:
             if data.get("clinic_id") != clinic.id:
                 data["clinic_id"] = clinic.id
                 event.metadata_json = json.dumps(data)
+        for key in db.scalars(select(LabPacket.file_key).where(LabPacket.id.in_(old_ids), LabPacket.file_key != "")):
+            delete_stored_file(key)
         db.execute(delete(LabPacket).where(LabPacket.id.in_(old_ids)))
         write_audit(db, "system", "", "retention_purge", "clinic", clinic.id, {"lab_packets": len(old_ids)})
         counts["lab_packets"] += len(old_ids)

@@ -396,6 +396,7 @@ class ClinicOut(BaseModel):
     retention_days: int
     clinician_name: str
     member_role: str
+    intake_address: str = ""
 
 
 class LabMarker(BaseModel):
@@ -419,6 +420,9 @@ class LabPacketIn(BaseModel):
 class LabPacketEditIn(BaseModel):
     summary: str = Field(max_length=6000)
     questions: list[str] = Field(default_factory=list, max_length=10)
+    # Filled once from the clinician's screen for labs that arrived by email.
+    markers: list["LabMarker"] | None = Field(default=None, max_length=80)
+    lab_date: str | None = Field(default=None, pattern=r"^(\d{4}-\d{2}-\d{2})?$")
 
 
 class LabPacketOut(BaseModel):
@@ -434,6 +438,7 @@ class LabPacketOut(BaseModel):
     review_seconds: int | None
     patient_viewed: bool
     edited: bool | None = None
+    source: str = "manual"
     created_at: datetime | None
 
 

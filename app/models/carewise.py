@@ -318,6 +318,8 @@ class Clinic(Base):
     name: Mapped[str] = mapped_column(String(160))
     tone: Mapped[str] = mapped_column(String(20), default="friendly")
     retention_days: Mapped[int] = mapped_column(Integer, default=90)
+    # Private part of the clinic's lab intake email address (labs+CODE@...).
+    intake_code: Mapped[str | None] = mapped_column(String(24), unique=True, index=True, nullable=True)
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -356,6 +358,10 @@ class LabPacket(Base):
     encrypted_draft: Mapped[str] = mapped_column(Text, default="")
     edited: Mapped[int | None] = mapped_column(Integer, nullable=True)
     patient_token_hash: Mapped[str] = mapped_column(String(64), default="", index=True)
+    # "manual" (added on screen) or "email" (forwarded to the clinic's intake address).
+    source: Mapped[str] = mapped_column(String(10), default="manual")
+    encrypted_source_text: Mapped[str] = mapped_column(Text, default="")
+    file_key: Mapped[str] = mapped_column(String(300), default="")
     patient_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

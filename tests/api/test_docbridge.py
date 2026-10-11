@@ -242,4 +242,4 @@ def test_nightly_purge_deletes_old_labs_but_keeps_the_log(monkeypatch):
     with TestClient(create_app()) as client:
         assert client.post("/maintenance/purge", headers={"X-CareWise-Cron-Token": "cron-secret"}).json()["lab_packets"] == 0
         log = client.get(f"/clinics/{clinic_id}/audit.csv", headers=owner).text
-        assert f"Lab {old['id'][-8:]}" in log and "Old labs deleted (retention)" in log and "CareWise (automatic)" in log
+        assert f"Lab {old['id'][-8:]}" in log and "Old labs deleted (retention)" in log and "FollowThrough Health (automatic)" in log

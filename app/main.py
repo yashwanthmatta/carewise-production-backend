@@ -42,9 +42,9 @@ DEGRADED_MODE_PATHS = {"/health", "/ready", "/features"}
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="CareWise API",
+        title="FollowThrough Health API",
         version="0.1.0",
-        description="Production-oriented CareWise backend scaffold.",
+        description="Production-oriented FollowThrough Health backend scaffold.",
     )
     app.add_middleware(
         CORSMiddleware,
@@ -63,7 +63,7 @@ def create_app() -> FastAPI:
         if app.state.startup_error and request.url.path not in DEGRADED_MODE_PATHS:
             response = JSONResponse(
                 status_code=503,
-                content={"detail": "CareWise API is not configured yet. See /ready."},
+                content={"detail": "FollowThrough Health API is not configured yet. See /ready."},
             )
             apply_security_headers(response)
             return response

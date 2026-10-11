@@ -21,11 +21,11 @@ def send_password_reset_email(to_email: str, reset_token: str) -> None:
         raise RuntimeError("Email delivery is not configured.")
 
     reset_url = password_reset_url(reset_token)
-    message = base_message(to_email, "Reset your CareWise password")
+    message = base_message(to_email, "Reset your FollowThrough Health password")
     message.set_content(
         "\n".join(
             [
-                "You requested a CareWise password reset.",
+                "You requested a FollowThrough Health password reset.",
                 "",
                 f"Open this link to reset your password: {reset_url}",
                 "",
@@ -42,15 +42,15 @@ def send_email_verification(to_email: str, verification_token: str) -> None:
         raise RuntimeError("Email delivery is not configured.")
 
     verify_url = email_verification_url(verification_token)
-    message = base_message(to_email, "Verify your CareWise email")
+    message = base_message(to_email, "Verify your FollowThrough Health email")
     message.set_content(
         "\n".join(
             [
-                "Welcome to CareWise.",
+                "Welcome to FollowThrough Health.",
                 "",
                 f"Open this link to verify your email address: {verify_url}",
                 "",
-                "If you did not create a CareWise account, you can ignore this email.",
+                "If you did not create a FollowThrough Health account, you can ignore this email.",
             ]
         )
     )

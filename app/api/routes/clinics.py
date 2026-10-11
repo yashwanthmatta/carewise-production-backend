@@ -31,7 +31,7 @@ from app.schemas.carewise import (
 from app.services.audit import write_audit
 from app.services.rate_limit import check_rate_limit
 
-# DocBridge: a clinic uploads a lab, CareWise drafts the patient explanation on the
+# DocBridge: a clinic uploads a lab, FollowThrough Health drafts the patient explanation on the
 # clinician's device, a named clinician approves or edits it, and only then does the
 # patient get a private link. Nothing is sent without approval; every step is logged.
 router = APIRouter()
@@ -389,7 +389,7 @@ def export_audit(clinic_id: str, user: CurrentUser = Depends(get_current_user), 
     writer = csv.writer(out)
     writer.writerow(["When (UTC)", "Who", "What", "Record"])
     for event in events:
-        who = "Patient" if event.actor_id == "patient_link" else "CareWise (automatic)" if event.actor_id == "system" else names.get(event.actor_id, "Former team member")
+        who = "Patient" if event.actor_id == "patient_link" else "FollowThrough Health (automatic)" if event.actor_id == "system" else names.get(event.actor_id, "Former team member")
         record = f"Lab {event.resource_id[-8:]}" if event.resource_type == "lab_packet" else "Clinic"
         when = (as_utc(event.created_at) or datetime.now(timezone.utc)).strftime("%Y-%m-%d %H:%M")
         writer.writerow([when, who, ACTION_LABELS.get(event.action, event.action), record])

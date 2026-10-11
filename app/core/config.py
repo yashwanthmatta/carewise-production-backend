@@ -15,6 +15,8 @@ DEFAULT_ALLOWED_ORIGINS = {
     "http://localhost:4173",
     "http://localhost:3000",
     "https://carewise-frontend.onrender.com",
+    "https://followthroughhealth.com",
+    "https://www.followthroughhealth.com",
 }
 
 

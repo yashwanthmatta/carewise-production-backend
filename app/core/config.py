@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     auth_rate_limit_window_seconds: int = 900
     auth_rate_limit_max_attempts: int = 8
+    # Phone-call pill reminders (Twilio). All four must be set for calls to go out;
+    # the cron token protects the endpoint a scheduler calls every few minutes.
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_from_number: str = ""
+    public_api_url: str = "https://carewise-api.onrender.com"
+    reminder_cron_token: str = ""
     # Founder-only access to feedback counts and early-access sign-ups. Set it in the
     # hosting dashboard; when empty the summary endpoint stays switched off.
     founder_token: str = ""
@@ -134,6 +141,13 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.env.lower() == "production"
+
+    @property
+    def reminder_calls_enabled(self) -> bool:
+        return all(
+            self.clean_env_value(value)
+            for value in (self.twilio_account_sid, self.twilio_auth_token, self.twilio_from_number, self.public_api_url)
+        )
 
     @property
     def email_delivery_enabled(self) -> bool:

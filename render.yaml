@@ -43,6 +43,16 @@ services:
         value: "10485760"
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: CAREWISE_TWILIO_ACCOUNT_SID
+        sync: false
+      - key: CAREWISE_TWILIO_AUTH_TOKEN
+        sync: false
+      - key: CAREWISE_TWILIO_FROM_NUMBER
+        sync: false
+      - key: CAREWISE_PUBLIC_API_URL
+        value: https://carewise-api.onrender.com
+      - key: CAREWISE_REMINDER_CRON_TOKEN
+        sync: false
       - key: CAREWISE_STRIPE_SECRET_KEY
         sync: false
       - key: CAREWISE_STRIPE_WEBHOOK_SECRET

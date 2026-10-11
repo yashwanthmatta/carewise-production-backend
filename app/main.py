@@ -21,6 +21,7 @@ from app.api.routes import (
     patients,
     privacy,
     product,
+    reminders,
     recommendations,
     reports,
     shares,
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
     app.include_router(shares.router, prefix="/shares", tags=["shares"])
     app.include_router(clinics.router, prefix="/clinics", tags=["docbridge"])
+    app.include_router(reminders.router, prefix="/reminders", tags=["reminders"])
 
     @app.on_event("startup")
     def startup() -> None:

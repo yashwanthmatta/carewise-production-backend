@@ -428,3 +428,43 @@ class ClinicInviteIn(BaseModel):
 class ClinicJoinIn(BaseModel):
     code: str = Field(min_length=8, max_length=40)
     display_name: str = Field(min_length=2, max_length=160)
+
+
+class ReminderIn(BaseModel):
+    # A medicine-time reminder. "times" are 24-hour "HH:MM" in the person's own time zone.
+    person: str = Field(default="Me", max_length=40)
+    label: str = Field(default="", max_length=60)
+    times: list[str] = Field(min_length=1, max_length=4)
+    days: list[str] = Field(default_factory=list, max_length=7)
+    timezone: str = Field(default="America/New_York", max_length=64)
+    language: str = Field(default="en", pattern="^(en|es)$")
+    call: bool = False
+    phone: str = Field(default="", max_length=20)
+    caller_name: str = Field(default="", max_length=40)
+    consent_confirmed: bool = False
+    alert_on_miss: bool = False
+
+
+class ReminderDoseOut(BaseModel):
+    time: str
+    status: str
+
+
+class ReminderOut(BaseModel):
+    id: str
+    person: str
+    label: str
+    times: list[str]
+    days: list[str]
+    timezone: str
+    language: str
+    call: bool
+    phone_last4: str
+    caller_name: str
+    call_status: str
+    alert_on_miss: bool
+    today: list[ReminderDoseOut]
+
+
+class ReminderTakenIn(BaseModel):
+    time: str = Field(default="", max_length=5)

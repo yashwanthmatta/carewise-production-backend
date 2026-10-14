@@ -127,7 +127,9 @@ def test_consent_call_then_reminder_call_then_missed_email(calls):
         event = db.scalars(select(ReminderEvent).where(ReminderEvent.kind == "dose")).one()
         assert event.status == "missed" and event.alerted_at is not None
     assert len(emails) == 1 and "Mom" in emails[0]["Subject"]
-    assert "medical alert" in emails[0].get_content()
+    body = emails[0].get_content()
+    assert "medical alert" in body and "We called Mom twice" in body
+    assert "Morning pills" not in body and "Morning pills" not in emails[0]["Subject"]
 
     with TestClient(create_app()) as client:
         answer = signed_post(client, dose_path, {"CallSid": "CA2"})
@@ -157,6 +159,39 @@ def test_app_only_reminder_is_marked_missed_after_an_hour(calls):
         assert reminder_routes.run_dispatch(db, now + timedelta(minutes=30))["missed"] == 0
         assert reminder_routes.run_dispatch(db, now + timedelta(minutes=61))["missed"] == 1
     assert placed == [] and len(emails) == 1
+    body = emails[0].get_content()
+    assert "Nobody marked it as taken" in body and "We called" not in body
+    assert "tap Taken" in body and body.rstrip().endswith("FollowThrough Health")
+
+
+def test_missed_email_explains_calls_waiting_for_agreement(calls):
+    # The person never pressed 1 on the first call, so no reminder call went out.
+    _, emails = calls
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        client.post(
+            "/reminders",
+            json=reminder_body(
+                times=[(now - timedelta(minutes=1)).strftime("%H:%M")], call=True, phone="+15551234567",
+                consent_confirmed=True, alert_on_miss=True,
+            ),
+            headers=headers,
+        )
+    with SessionLocal() as db:
+        reminder_routes.run_dispatch(db, now)
+        assert reminder_routes.run_dispatch(db, now + timedelta(minutes=61))["missed"] == 1
+        dose = db.scalars(select(ReminderEvent).where(ReminderEvent.kind == "dose")).one()
+        assert dose.attempts == 0  # only the "press 1 to agree" call went out
+    body = emails[0].get_content()
+    assert "has not yet pressed 1" in body and "We called" not in body
+
+
+def test_friendly_clock():
+    assert reminder_routes.friendly_clock(datetime(2026, 1, 1, 0, 5)) == "12:05 AM"
+    assert reminder_routes.friendly_clock(datetime(2026, 1, 1, 8, 0)) == "8:00 AM"
+    assert reminder_routes.friendly_clock(datetime(2026, 1, 1, 12, 30)) == "12:30 PM"
+    assert reminder_routes.friendly_clock(datetime(2026, 1, 1, 20, 45)) == "8:45 PM"
 
 
 @pytest.mark.parametrize("language", ["en", "es"])

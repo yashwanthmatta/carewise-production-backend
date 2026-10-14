@@ -394,6 +394,23 @@ class DraftEdit(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
+class PatientQuestion(Base):
+    # One patient follow-up question on an approved packet and the reply they got, kept
+    # encrypted for safety review and deleted with the packet.
+    __tablename__ = "patient_questions"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("qa"))
+    packet_id: Mapped[str] = mapped_column(String(80), index=True)
+    clinic_id: Mapped[str] = mapped_column(String(80), index=True)
+    encrypted_question: Mapped[str] = mapped_column(Text, default="")
+    encrypted_answer: Mapped[str] = mapped_column(Text, default="")
+    citations: Mapped[str] = mapped_column(Text, default="[]")
+    deflected: Mapped[int] = mapped_column(Integer, default=0)
+    reason: Mapped[str] = mapped_column(String(20), default="")
+    model: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class ModelVersion(Base):
     # Which generator wrote a draft. A person changes status; nothing is promoted automatically.
     __tablename__ = "model_versions"

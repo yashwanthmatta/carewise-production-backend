@@ -15,6 +15,7 @@ from app.models.carewise import (
     DraftEdit,
     LabPacket,
     PasswordResetToken,
+    PatientQuestion,
     ReminderEvent,
 )
 from app.services.audit import write_audit
@@ -49,6 +50,7 @@ def run_purge(db: Session, now: datetime) -> dict:
                 event.metadata_json = json.dumps(data)
         for key in db.scalars(select(LabPacket.file_key).where(LabPacket.id.in_(old_ids), LabPacket.file_key != "")):
             delete_stored_file(key)
+        counts["patient_questions"] = counts.get("patient_questions", 0) + (db.execute(delete(PatientQuestion).where(PatientQuestion.packet_id.in_(old_ids))).rowcount or 0)
         counts["draft_edits"] = counts.get("draft_edits", 0) + (db.execute(delete(DraftEdit).where(DraftEdit.packet_id.in_(old_ids))).rowcount or 0)
         db.execute(delete(LabPacket).where(LabPacket.id.in_(old_ids)))
         write_audit(db, "system", "", "retention_purge", "clinic", clinic.id, {"lab_packets": len(old_ids)})

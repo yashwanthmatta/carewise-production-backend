@@ -28,6 +28,7 @@ from app.models.carewise import (
     NotificationPreference,
     PatientProfile,
     PasswordResetToken,
+    PatientQuestion,
     RefreshToken,
     ReportAnalysis,
     ReportUpload,
@@ -267,6 +268,7 @@ def delete_my_account_data(
                 delete_stored_file(key)
             except Exception:
                 pass
+        db.execute(delete(PatientQuestion).where(PatientQuestion.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(DraftEdit).where(DraftEdit.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(LabPacket).where(LabPacket.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(ClinicInvite).where(ClinicInvite.clinic_id.in_(owned_clinic_ids)))

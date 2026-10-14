@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import logging
 import io
 import json
 import secrets
@@ -14,7 +15,7 @@ from app.core.config import settings
 from app.core.crypto import decrypt_field, encrypt_field
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
-from app.models.carewise import AuditEvent, Clinic, ClinicInvite, ClinicMember, DraftEdit, LabPacket
+from app.models.carewise import AuditEvent, Clinic, ClinicInvite, ClinicMember, DraftEdit, LabPacket, PatientQuestion
 from app.schemas.carewise import (
     ClinicIn,
     ClinicInviteIn,
@@ -27,10 +28,12 @@ from app.schemas.carewise import (
     LabPacketIn,
     LabPacketOut,
     PacketViewIn,
+    PatientQuestionIn,
 )
 from app.services.audit import write_audit
 from app.services.deidentify import deidentify_text, year_only
 from app.services.draft_edits import record_draft_edit
+from app.services import patient_qa
 from app.services.rate_limit import check_rate_limit
 
 # DocBridge: a clinic uploads a lab, FollowThrough Health drafts the patient explanation on the
@@ -328,6 +331,7 @@ ACTION_LABELS = {
     "clinic_member_left": "Left the clinic",
     "visit_summary_viewed": "Visit summary opened",
     "training_export": "De-identified edit pairs downloaded",
+    "patient_questions_reviewed": "Patient questions reviewed",
     "audit_exported": "Audit log downloaded",
     "retention_purge": "Old labs deleted (retention)",
 }
@@ -629,3 +633,108 @@ def view_packet(payload: PacketViewIn, request: Request, db: Session = Depends(g
         "summary": data["summary"],
         "questions": data["questions"],
     }
+
+
+QA_PER_PACKET_PER_DAY = 30
+qa_log = logging.getLogger("carewise.patient_qa")
+
+
+def open_patient_packet(db: Session, token: str) -> LabPacket:
+    packet = db.scalar(select(LabPacket).where(LabPacket.patient_token_hash == sha(token)))
+    now = datetime.now(timezone.utc)
+    if packet is None or packet.status != "approved" or (as_utc(packet.expires_at) or now) <= now:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=NOT_AVAILABLE)
+    return packet
+
+
+@router.post("/packets/qa")
+def patient_question(payload: PatientQuestionIn, request: Request, db: Session = Depends(get_db)):
+    # The private link is the only key: answers use this packet's approved summary and
+    # values plus this patient's earlier approved labs at the same clinic, nothing else.
+    from app.api.routes import assistant
+
+    check_rate_limit(db, request, "patient_qa", max_attempts=20, window_seconds=3600)
+    packet = open_patient_packet(db, payload.token)
+    day_ago = datetime.now(timezone.utc) - timedelta(days=1)
+    asked_today = len(db.scalars(select(PatientQuestion.id).where(PatientQuestion.packet_id == packet.id, PatientQuestion.created_at >= day_ago)).all())
+    if asked_today >= QA_PER_PACKET_PER_DAY:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="That's a lot of questions for one day. Please bring the rest to your care team.")
+    question = payload.question.strip()
+    reason = patient_qa.screen_question(question)
+    model = ""
+    if reason:
+        result = patient_qa.deflection(reason)
+    elif not assistant.assistant_enabled():
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Questions aren't switched on yet. Please ask your care team.")
+    else:
+        older = db.scalars(
+            select(LabPacket).where(
+                LabPacket.clinic_id == packet.clinic_id,
+                LabPacket.patient_ref_hash == packet.patient_ref_hash,
+                LabPacket.status == "approved",
+                LabPacket.id != packet.id,
+            ).order_by(LabPacket.approved_at.desc()).limit(5)
+        ).all()
+        sources = patient_qa.build_sources(
+            decrypt_field(packet.encrypted_summary),
+            load_json(packet.encrypted_markers, []),
+            packet.lab_date,
+            [(p.lab_date, load_json(p.encrypted_markers, [])) for p in older],
+        )
+        try:
+            response = assistant.get_client().beta.messages.create(
+                model=settings.assistant_model,
+                max_tokens=1500,
+                system=patient_qa.SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": patient_qa.user_message(question, sources)}],
+                output_config={"effort": "low"},
+                betas=["server-side-fallback-2026-07-01"],
+                fallbacks="default",
+            )
+        except Exception as exc:  # noqa: BLE001 - any provider failure gets the same polite reply
+            qa_log.warning("patient question failed: %s", type(exc).__name__)
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="We couldn't answer right now. Please try again, or ask your care team.") from exc
+        model = getattr(response, "model", "") or ""
+        if getattr(response, "stop_reason", "") == "refusal":
+            result = patient_qa.deflection("outside")
+        else:
+            raw = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
+            result = patient_qa.parse_answer(raw, sources)
+    db.add(PatientQuestion(
+        packet_id=packet.id,
+        clinic_id=packet.clinic_id,
+        encrypted_question=encrypt_field(question),
+        encrypted_answer=encrypt_field(result["answer"]),
+        citations=json.dumps(result["citations"]),
+        deflected=int(result["deflect_to_doctor"]),
+        reason=result["reason"],
+        model=model[:80],
+    ))
+    db.commit()
+    return {"answer": result["answer"], "citations": result["citations"], "deflect_to_doctor": result["deflect_to_doctor"]}
+
+
+@router.get("/{clinic_id}/patient-questions")
+def patient_questions_log(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Owner safety review: what patients asked and what they were told.
+    _, member = membership(db, user, clinic_id)
+    if member.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the clinic owner can review patient questions.")
+    refs = {p.id: decrypt_field(p.encrypted_patient_ref) for p in db.scalars(select(LabPacket).where(LabPacket.clinic_id == clinic_id))}
+    rows = db.scalars(
+        select(PatientQuestion).where(PatientQuestion.clinic_id == clinic_id).order_by(PatientQuestion.created_at.desc()).limit(200)
+    ).all()
+    write_audit(db, user.user_id, "", "patient_questions_reviewed", "clinic", clinic_id, {"rows": len(rows), "clinic_id": clinic_id})
+    db.commit()
+    return [
+        {
+            "patient_ref": refs.get(r.packet_id, ""),
+            "question": decrypt_field(r.encrypted_question),
+            "answer": decrypt_field(r.encrypted_answer),
+            "citations": json.loads(r.citations or "[]"),
+            "deflected": bool(r.deflected),
+            "reason": r.reason,
+            "created_at": r.created_at,
+        }
+        for r in rows
+    ]

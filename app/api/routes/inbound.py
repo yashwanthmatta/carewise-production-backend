@@ -5,7 +5,6 @@ import logging
 import re
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
@@ -103,10 +102,14 @@ def recipient_codes(message: EmailMessage) -> list[str]:
     return codes
 
 
-def patient_ref_from(subject: str) -> str:
+def patient_ref_from(subject: str) -> str | None:
+    """The patient code from the subject, e.g. "DEID JD-2201". Only a word with a digit
+    counts, so "DEID lab results" never files two patients under the same code "lab"."""
     rest = re.sub(r"\bdeid\b", " ", SUBJECT_NOISE.sub("", subject or ""), flags=re.IGNORECASE)
-    match = REF_PATTERN.search(rest.strip(" :-[]()"))
-    return match.group(0) if match else f"EMAIL-{datetime.now(timezone.utc):%Y%m%d}"
+    for match in REF_PATTERN.finditer(rest):
+        if re.search(r"\d", match.group(0)):
+            return match.group(0)
+    return None
 
 
 def pdf_attachments(message: EmailMessage) -> list[tuple[str, bytes]]:
@@ -153,7 +156,7 @@ def process_message(db: Session, raw: bytes) -> dict:
         packet = LabPacket(
             clinic_id=clinic.id,
             patient_ref_hash="",
-            encrypted_patient_ref=encrypt_field(patient_ref),
+            encrypted_patient_ref="",
             status="new" if text.strip() else "manual_review",
             created_by=member.user_id,
             source="email",
@@ -161,9 +164,12 @@ def process_message(db: Session, raw: bytes) -> dict:
         )
         from app.api.routes.clinics import ref_hash  # shared patient-reference hashing
 
-        packet.patient_ref_hash = ref_hash(clinic.id, patient_ref)
         db.add(packet)
         db.flush()
+        # No code in the subject: give this lab its own code so it never shares history.
+        own_ref = patient_ref or f"EMAIL-{packet.id[-8:].upper()}"
+        packet.encrypted_patient_ref = encrypt_field(own_ref)
+        packet.patient_ref_hash = ref_hash(clinic.id, own_ref)
         packet.file_key = f"intake/{clinic.id}/{packet.id}.pdf.enc"
         store_private_bytes(packet.file_key, encrypt_bytes(data))
         write_audit(

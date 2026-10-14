@@ -78,6 +78,7 @@ def signup(payload: SignupRequest, request: Request, db: Session = Depends(get_d
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     check_rate_limit(db, request, "auth_login", payload.email)
+    check_rate_limit(db, request, "auth_login_account", payload.email, max_attempts=20, window_seconds=900, by_ip=False)
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid login.")
@@ -132,6 +133,9 @@ def use_second_factor(user: User, code: str) -> bool:
 def login_two_factor(payload: TwoFactorLoginIn, request: Request, db: Session = Depends(get_db)):
     user_id = read_challenge(payload.challenge)
     check_rate_limit(db, request, "auth_two_factor", user_id or "unknown")
+    if user_id:
+        # Six-digit codes: at most 10 tries per account every 15 minutes, from anywhere.
+        check_rate_limit(db, request, "auth_two_factor_account", user_id, max_attempts=10, window_seconds=900, by_ip=False)
     user = db.get(User, user_id) if user_id else None
     if user is None or not user.totp_enabled:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sign in again.")
@@ -170,6 +174,7 @@ def two_factor_enable(
     account.totp_enabled = 1
     account.totp_last_step = step
     account.recovery_code_hashes = json.dumps([totp.hash_recovery_code(code) for code in codes])
+    revoke_sessions(db, user.user_id)
     write_audit(db, user.user_id, "", "two_factor_enabled", "user", user.user_id, {})
     db.commit()
     return TwoFactorEnabledOut(enabled=True, recovery_codes=codes)
@@ -187,6 +192,7 @@ def two_factor_disable(
     account.totp_enabled = 0
     account.encrypted_totp_secret = ""
     account.recovery_code_hashes = ""
+    revoke_sessions(db, user.user_id)
     write_audit(db, user.user_id, "", "two_factor_disabled", "user", user.user_id, {})
     db.commit()
     return TwoFactorEnabledOut(enabled=False)
@@ -333,6 +339,7 @@ def confirm_password_reset(payload: PasswordResetConfirmIn, request: Request, db
     user.password_hash = hash_password(payload.new_password)
     reset_record.status = "used"
     reset_record.used_at = datetime.now(timezone.utc)
+    revoke_sessions(db, user.id)
     write_audit(db, user.id, "", "password_reset_completed", "user", user.id, {})
     if user.totp_enabled:
         db.commit()
@@ -340,6 +347,12 @@ def confirm_password_reset(payload: PasswordResetConfirmIn, request: Request, db
     token_response = issue_token_pair(db, user)
     db.commit()
     return token_response
+
+
+def revoke_sessions(db: Session, user_id: str) -> None:
+    # After a password or sign-in change, every device has to sign in again.
+    for record in db.scalars(select(RefreshToken).where(RefreshToken.user_id == user_id, RefreshToken.status == "active")):
+        record.status = "revoked"
 
 
 def token_is_expired(expires_at: datetime) -> bool:

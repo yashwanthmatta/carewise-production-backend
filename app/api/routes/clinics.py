@@ -128,6 +128,7 @@ def clinic_out(clinic: Clinic, member: ClinicMember) -> dict:
         "retention_days": clinic.retention_days,
         "clinician_name": member.display_name,
         "member_role": member.role,
+        "patient_qa_enabled": bool(clinic.patient_qa_enabled),
     }
 
 
@@ -370,6 +371,8 @@ def update_settings(
         for key, value in (("name", payload.name.strip()), ("tone", payload.tone), ("retention_days", payload.retention_days))
         if getattr(clinic, key) != value
     }
+    if payload.patient_qa_enabled is not None and bool(clinic.patient_qa_enabled) != payload.patient_qa_enabled:
+        changes["patient_qa_enabled"] = int(payload.patient_qa_enabled)
     for key, value in changes.items():
         setattr(clinic, key, value)
     if changes:
@@ -632,6 +635,7 @@ def view_packet(payload: PacketViewIn, request: Request, db: Session = Depends(g
         "markers": data["markers"],
         "summary": data["summary"],
         "questions": data["questions"],
+        "questions_enabled": bool(clinic and clinic.patient_qa_enabled),
     }
 
 
@@ -655,6 +659,9 @@ def patient_question(payload: PatientQuestionIn, request: Request, db: Session =
 
     check_rate_limit(db, request, "patient_qa", max_attempts=20, window_seconds=3600)
     packet = open_patient_packet(db, payload.token)
+    clinic = db.get(Clinic, packet.clinic_id)
+    if clinic is None or not clinic.patient_qa_enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your clinic hasn't turned on questions. Please ask your care team.")
     day_ago = datetime.now(timezone.utc) - timedelta(days=1)
     asked_today = len(db.scalars(select(PatientQuestion.id).where(PatientQuestion.packet_id == packet.id, PatientQuestion.created_at >= day_ago)).all())
     if asked_today >= QA_PER_PACKET_PER_DAY:
@@ -686,7 +693,8 @@ def patient_question(payload: PatientQuestionIn, request: Request, db: Session =
                 model=settings.assistant_model,
                 max_tokens=1500,
                 system=patient_qa.SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": patient_qa.user_message(question, sources)}],
+                # Names, birth dates and contact details the patient types are removed first.
+                messages=[{"role": "user", "content": patient_qa.user_message(deidentify_text(question), sources)}],
                 output_config={"effort": "low"},
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",

@@ -21,7 +21,22 @@ TREATMENT = re.compile(
     r"vitamin pills?|treat(?:ment)?|surgery|stop taking|start taking|should i take|how much should i take)\b",
     re.I,
 )
-# Checked on the model's answer as well: no doses or medicine changes ever reach a patient.
+# Checked on the model's answer: no diagnosis, reassurance or medicine wording reaches a patient.
+DIAGNOSIS_ANSWER = re.compile(
+    r"\b(?:you (?:have|probably have|may have|might have|likely have)|(?:means|shows|suggests) (?:that )?you (?:have|are)|"
+    r"you(?:'re| are) (?:diabetic|prediabetic|anemic|anaemic|healthy|fine|ok|okay|sick|at risk)|"
+    r"nothing to worry|no need to worry|not (?:serious|a concern|concerning)|(?:is|are) (?:serious|dangerous)|"
+    r"diagnos\w*|definitely|for sure|normal for you)\b",
+    re.I,
+)
+MEDICINE_ANSWER = re.compile(
+    r"\b(?:\w+(?:statin|sartan|olol|formin|dipine|gliptin|gliflozin|glutide|prazole|tidine|azole|cillin|mycin|cycline|floxacin|"
+    r"thiazide|semide|parin|xaban|gatran|oxetine|profen)|\w{2,}pril|insulin|aspirin|ibuprofen|"
+    r"acetaminophen|paracetamol|tylenol|advil|motrin|aleve|naproxen|warfarin|levothyroxine|synthroid|metformin|lisinopril|"
+    r"amlodipine|prednisone|antibiotics?|steroids?|iron pills?|vitamin [a-z0-9]+ (?:pills?|tablets?|supplements?))\b"
+    r"|\b\d+(?:\.\d+)?\s*(?:tablets?|pills?|capsules?|puffs?|drops?|teaspoons?|tsp|tbsp|doses?)\b",
+    re.I,
+)
 UNSAFE_ANSWER = re.compile(
     r"\b\d+(?:\.\d+)?\s*(?:mg|mcg|µg|units?|iu)\b(?!\s*/\s*(?:dl|l|ml))|\b(?:start|stop|increase|decrease|double|skip)\s+(?:taking\s+)?(?:your\s+)?(?:medicine|medication|dose|pills?)\b",
     re.I,
@@ -108,6 +123,8 @@ def parse_answer(raw: str, sources: list[dict]) -> dict:
         return deflection("outside")
     if not answer or not citations:
         return deflection("outside")
-    if UNSAFE_ANSWER.search(answer) or TREATMENT.search(answer) and re.search(r"\b(?:take|start|stop|try)\b", answer, re.I):
+    if UNSAFE_ANSWER.search(answer) or MEDICINE_ANSWER.search(answer) or TREATMENT.search(answer) and re.search(r"\b(?:take|start|stop|try)\b", answer, re.I):
         return deflection("treatment")
+    if DIAGNOSIS_ANSWER.search(answer):
+        return deflection("diagnosis")
     return {"answer": answer[:1200], "citations": citations, "deflect_to_doctor": False, "reason": "answered"}

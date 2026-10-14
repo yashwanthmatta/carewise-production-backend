@@ -106,8 +106,8 @@ def test_amazon_ses_notification_format():
             "Type": "Notification",
             "Message": json.dumps({
                 "receipt": {"action": {"type": "SNS", "encoding": "BASE64"}},
-                "content": base64.b64encode(raw_email(email, clinic["intake_address"], subject="Fwd: DEID AB-7")).decode(),
+                "content": base64.b64encode(raw_email(email, clinic["intake_address"], subject="Fwd: DEID AB-700")).decode(),
             }),
         }
         assert client.post("/inbound/email/intake-secret", json=notification).json()["labs"] == 1
-        assert client.get(f"/clinics/{clinic['id']}/packets", headers=headers).json()[0]["patient_ref"] == "AB-7"
+        assert client.get(f"/clinics/{clinic['id']}/packets", headers=headers).json()[0]["patient_ref"] == "AB-700"

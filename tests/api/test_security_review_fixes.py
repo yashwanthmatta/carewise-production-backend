@@ -17,13 +17,13 @@ PASSWORD = "change-me-long-password"
 def test_emailed_labs_with_a_generic_subject_never_share_a_patient_code():
     with TestClient(create_app()) as client:
         headers, email, clinic = clinic_with_owner(client)
-        for subject in ("DEID lab results", "DEID lab results", "DEID"):
+        for subject in ("DEID lab results", "DEID lab results", "DEID", "DEID A1C results", "DEID Vitamin B12", "DEID CMP-14", "DEID labs 10/14", "DEID results Oct 2026"):
             client.post("/inbound/email/intake-secret", content=raw_email(email, clinic["intake_address"], subject=subject), headers={"Content-Type": "message/rfc822"})
         client.post("/inbound/email/intake-secret", content=raw_email(email, clinic["intake_address"], subject="Fwd: DEID JD-2201"), headers={"Content-Type": "message/rfc822"})
         refs = [p["patient_ref"] for p in client.get(f"/clinics/{clinic['id']}/packets", headers=headers).json()]
         assert "JD-2201" in refs and "lab" not in refs
         generic = [r for r in refs if r != "JD-2201"]
-        assert len(generic) == 3 and len(set(generic)) == 3 and all(r.startswith("EMAIL-") for r in generic)
+        assert len(generic) == 8 and len(set(generic)) == 8 and all(r.startswith("EMAIL-") for r in generic)
 
 
 class FakeRequest:

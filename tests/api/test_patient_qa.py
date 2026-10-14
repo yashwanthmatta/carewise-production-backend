@@ -8,9 +8,36 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.main import create_app
 from app.models.carewise import LabPacket, PatientQuestion
-from tests.api.test_assistant import fake_client, text_response
+from types import SimpleNamespace
+
+from app.api.routes import assistant
+from app.services import patient_qa
+from tests.api.test_assistant import text_response
 from tests.api.test_docbridge import draft, make_clinic
 from tests.api.test_reports_and_access_control import auth_headers
+
+class FakeMessages:
+    """Answers questions with `answer` and the safety check with `verdict`."""
+
+    def __init__(self, answer, verdict='{"safe": true}'):
+        self.answer, self.verdict, self.calls, self.checks = answer, verdict, [], []
+
+    def create(self, **kwargs):
+        if kwargs["system"] == patient_qa.SAFETY_PROMPT:
+            self.checks.append(kwargs)
+            if isinstance(self.verdict, Exception):
+                raise self.verdict
+            return self.verdict if not isinstance(self.verdict, str) else text_response(self.verdict)
+        self.calls.append(kwargs)
+        return self.answer
+
+
+def fake_client(monkeypatch, answer, verdict='{"safe": true}'):
+    messages = FakeMessages(answer, verdict)
+    monkeypatch.setattr(settings, "anthropic_api_key", "test-key")
+    monkeypatch.setattr(assistant, "get_client", lambda: SimpleNamespace(beta=SimpleNamespace(messages=messages)))
+    return messages
+
 
 SUMMARY = "Hi,\n\nYour LDL cholesterol is above the usual target.\n\nWe'll go over it at your next visit."
 
@@ -180,3 +207,37 @@ def test_identifiers_in_the_question_are_removed_before_the_model(monkeypatch):
         sent = messages.calls[0]["messages"][0]["content"]
         for gone in ("1950", "512-555-0134", "Maria", "Lopez"):
             assert gone not in sent, gone
+
+
+UNSAFE_FROM_SECOND_REVIEW = [
+    "You're likely diabetic.", "This is normal.", "Your result is normal.", "These results look fine.",
+    "You don't need to worry.", "Your kidneys are fine.", "This indicates diabetes.", "This could be a sign of diabetes.",
+    "Your result is in the diabetic range.", "Nothing alarming here.", "This isn't anything serious.",
+    "Avoid sugar and eat less carbs to fix this.", "Your doctor may suggest a statin.", "Fish oil supplements may help.",
+]
+
+
+def test_second_review_unsafe_answers_never_reach_the_patient():
+    sources = patient_qa.build_sources(SUMMARY, [{"name": "LDL cholesterol", "value": "148", "unit": "mg/dL"}], "2026-10-01", [])
+    for text in UNSAFE_FROM_SECOND_REVIEW:
+        result = patient_qa.parse_answer(json.dumps({"answer": text, "citations": ["summary:paragraph_2"]}), sources)
+        assert result["deflect_to_doctor"] is True, text
+
+
+def test_brand_names_and_anything_the_safety_check_rejects_are_replaced(monkeypatch):
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        enable_qa(client, owner, clinic_id)
+        token = approved(client, owner, clinic_id, "JD-1", "148", "2026-10-01")["patient_token"]
+        for brand in ("Crestor", "Lipitor", "Ozempic", "Jardiance", "Eliquis"):
+            reply = json.dumps({"answer": f"Your doctor may mention {brand}.", "citations": ["summary:paragraph_2"]})
+            messages = fake_client(monkeypatch, text_response(reply), verdict='{"safe": false}')
+            body = ask(client, token, "What does high LDL mean?").json()
+            assert body["deflect_to_doctor"] is True and brand not in body["answer"] and len(messages.checks) == 1
+        # The check fails closed: an error or an unclear verdict also means "ask your doctor".
+        good = json.dumps({"answer": "Your LDL was 148 mg/dL.", "citations": ["summary:paragraph_2"]})
+        for verdict in (RuntimeError("down"), "maybe", '{"safe": "yes"}'):
+            fake_client(monkeypatch, text_response(good), verdict=verdict)
+            assert ask(client, token, "What was my LDL?").json()["deflect_to_doctor"] is True
+        fake_client(monkeypatch, text_response(good))
+        assert ask(client, token, "What was my LDL?").json()["deflect_to_doctor"] is False

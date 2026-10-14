@@ -36,7 +36,6 @@ MAX_ATTACHMENTS = 5
 MAX_PDF_BYTES = 10 * 1024 * 1024
 MAX_RAW_BYTES = 40 * 1024 * 1024
 CODE_PATTERN = re.compile(r"^(?:labs\+)?([a-z0-9]{8,24})$")
-REF_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,29}")
 SUBJECT_NOISE = re.compile(r"^\s*((fwd?|fw|re)\s*:\s*)+", re.IGNORECASE)
 
 
@@ -102,14 +101,22 @@ def recipient_codes(message: EmailMessage) -> list[str]:
     return codes
 
 
+# A patient code in the subject must look like one: letters, a dash, then 3+ digits,
+# right after DEID ("DEID JD-1042"). Lab names and dates ("A1C", "B12", "CMP-14",
+# "10/14") never count, so two patients can't end up under the same code.
+EXPLICIT_REF = re.compile(r"^[A-Za-z]{1,6}-\d{3,10}$")
+LAB_WORDS = {"cmp", "bmp", "cbc", "lft", "tsh", "a1c", "hba1c", "lipid", "lipids", "panel", "labs", "lab"}
+
+
 def patient_ref_from(subject: str) -> str | None:
-    """The patient code from the subject, e.g. "DEID JD-2201". Only a word with a digit
-    counts, so "DEID lab results" never files two patients under the same code "lab"."""
-    rest = re.sub(r"\bdeid\b", " ", SUBJECT_NOISE.sub("", subject or ""), flags=re.IGNORECASE)
-    for match in REF_PATTERN.finditer(rest):
-        if re.search(r"\d", match.group(0)):
-            return match.group(0)
-    return None
+    rest = SUBJECT_NOISE.sub("", subject or "")
+    match = re.search(r"\bdeid\b[\s:\-–]*([^\s,;]+)", rest, re.IGNORECASE)
+    if not match:
+        return None
+    word = match.group(1).strip(" :-[]()")
+    if not EXPLICIT_REF.match(word) or word.split("-")[0].lower() in LAB_WORDS:
+        return None
+    return word
 
 
 def pdf_attachments(message: EmailMessage) -> list[tuple[str, bytes]]:

@@ -708,6 +708,25 @@ def patient_question(payload: PatientQuestionIn, request: Request, db: Session =
         else:
             raw = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
             result = patient_qa.parse_answer(raw, sources)
+            if not result["deflect_to_doctor"]:
+                # A second, independent check; any doubt or error means "ask your doctor".
+                try:
+                    check = assistant.get_client().beta.messages.create(
+                        model=settings.assistant_model,
+                        max_tokens=200,
+                        system=patient_qa.SAFETY_PROMPT,
+                        messages=[{"role": "user", "content": patient_qa.safety_message(result["answer"], sources)}],
+                        output_config={"effort": "low"},
+                        betas=["server-side-fallback-2026-07-01"],
+                        fallbacks="default",
+                    )
+                    verdict = "".join(block.text for block in check.content if getattr(block, "type", "") == "text")
+                    safe = getattr(check, "stop_reason", "") != "refusal" and patient_qa.passed_safety_check(verdict)
+                except Exception as exc:  # noqa: BLE001 - fail closed
+                    qa_log.warning("patient answer check failed: %s", type(exc).__name__)
+                    safe = False
+                if not safe:
+                    result = {**patient_qa.deflection("outside"), "reason": "failed_check"}
     db.add(PatientQuestion(
         packet_id=packet.id,
         clinic_id=packet.clinic_id,

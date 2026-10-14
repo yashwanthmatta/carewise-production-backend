@@ -110,7 +110,7 @@ def test_consent_call_then_reminder_call_then_missed_email(calls):
         consent_url = placed[0][1]
         path = consent_url.removeprefix(API)
         greeting = signed_post(client, path, {"CallSid": "CA1"})
-        assert "agree" in greeting.text and "Priya" in greeting.text
+        assert "Is that okay" in greeting.text and "Priya" in greeting.text
         assert "Morning pills" not in greeting.text
         assert signed_post(client, path + "/answer", {"Digits": "1"}).status_code == 200
         assert client.get("/reminders", headers=headers).json()[0]["call_status"] == "active"
@@ -157,3 +157,24 @@ def test_app_only_reminder_is_marked_missed_after_an_hour(calls):
         assert reminder_routes.run_dispatch(db, now + timedelta(minutes=30))["missed"] == 0
         assert reminder_routes.run_dispatch(db, now + timedelta(minutes=61))["missed"] == 1
     assert placed == [] and len(emails) == 1
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_call_scripts_are_clear_for_an_older_listener(language):
+    from app.services import reminder_calls
+
+    lines = reminder_calls.SCRIPTS[language]
+    for key in ("consent", "dose"):
+        text = reminder_calls.script(language, key, "Priya")
+        assert "FollowThrough Health" in text and "Priya" in text
+        assert ("press 9" if language == "en" else "marque 9") in text
+        assert ("press 2" if language == "en" else "marque 2") in text
+    assert ("press 9" if language == "en" else "marque 9") in lines["consent_yes"]
+    # Never a medicine name, dose or amount: only "your medicine".
+    for text in lines.values():
+        assert not any(word in text.lower() for word in ("mg", "pill", "tablet", "dose", "dosis", "pastilla"))
+    assert all(len(sentence.split()) <= 16 for text in lines.values() for sentence in text.split(". "))
+
+    body = reminder_calls.gather_twiml(language, reminder_calls.script(language, "dose"), "https://api.test/a")
+    assert body.index('<Pause length="1"/>') < body.index("<Gather")
+    assert 'timeout="10"' in body and '<prosody rate="90%">' in body

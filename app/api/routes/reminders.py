@@ -283,6 +283,28 @@ def call_for(event: ReminderEvent, reminder: MedicineReminder) -> None:
         log.exception("Reminder call failed for %s", event.id)
 
 
+def friendly_clock(moment: datetime) -> str:
+    # 20:30 -> "8:30 PM", easier to read in an email than a 24-hour time.
+    hour = moment.hour % 12 or 12
+    return f"{hour}:{moment.minute:02d} {'AM' if moment.hour < 12 else 'PM'}"
+
+
+def why_not_confirmed(event: ReminderEvent, reminder: MedicineReminder, person: str) -> str:
+    # Say what really happened, so the family is not told "we called" when no call went out.
+    attempts = event.attempts or 0
+    if attempts:
+        times = "once" if attempts == 1 else "twice" if attempts == 2 else f"{attempts} times"
+        return f"We called {person} {times} and nobody pressed 1 to say it was taken."
+    if reminder.call_status == "pending_consent":
+        return (
+            f"No reminder call was made, because {person} has not yet pressed 1 on the first call to agree to calls. "
+            "You can send that first call again from the reminder in FollowThrough Health."
+        )
+    if reminder.call_status == "stopped":
+        return "No reminder call was made, because reminder calls were turned off from the phone (someone pressed 9)."
+    return "Nobody marked it as taken in FollowThrough Health."
+
+
 def alert_missed(db: Session, event: ReminderEvent, reminder: MedicineReminder) -> None:
     if not reminder.alert_on_miss or not settings.email_delivery_enabled or event.alerted_at:
         return
@@ -290,15 +312,18 @@ def alert_missed(db: Session, event: ReminderEvent, reminder: MedicineReminder) 
     if owner is None:
         return
     person = decrypt_field(reminder.encrypted_person) or "your family member"
-    clock = as_utc(event.due_at).astimezone(zone(reminder.timezone)).strftime("%H:%M")
-    called = reminder.call_status == "active"
+    clock = friendly_clock(as_utc(event.due_at).astimezone(zone(reminder.timezone)))
     message = base_message(owner.email, f"FollowThrough Health: the {clock} medicine reminder for {person} was not confirmed")
-    how = "We called twice and nobody pressed 1 to say it was taken." if called else "Nobody marked it as taken in FollowThrough Health."
+    # Never include the reminder label: families sometimes type the medicine name there.
     message.set_content(
-        f"Hello,\n\nThe {clock} medicine reminder for {person} was not confirmed today. {how}\n\n"
-        "You may want to check in with them. This is a reminder service, not a medical alert. "
+        f"Hello,\n\nThe {clock} medicine reminder for {person} was not confirmed today.\n\n"
+        f"{why_not_confirmed(event, reminder, person)}\n\n"
+        "What you can do:\n"
+        f"- Check in with {person}.\n"
+        "- If it was taken, open FollowThrough Health and tap Taken on that reminder.\n\n"
+        "This is a reminder service, not a medical alert. "
         "In an emergency, call your local emergency number.\n\n"
-        f"Manage reminders: {settings.frontend_url}\n\nCareWise"
+        f"Manage reminders: {settings.frontend_url}\n\nFollowThrough Health"
     )
     try:
         send_email(message)

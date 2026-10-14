@@ -371,6 +371,11 @@ def update_settings(
         for key, value in (("name", payload.name.strip()), ("tone", payload.tone), ("retention_days", payload.retention_days))
         if getattr(clinic, key) != value
     }
+    if payload.patient_qa_enabled and not settings.patient_qa_safety_verified:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Patient questions can't be turned on yet: the safety check hasn't been completed.",
+        )
     if payload.patient_qa_enabled is not None and bool(clinic.patient_qa_enabled) != payload.patient_qa_enabled:
         changes["patient_qa_enabled"] = int(payload.patient_qa_enabled)
     for key, value in changes.items():
@@ -635,7 +640,7 @@ def view_packet(payload: PacketViewIn, request: Request, db: Session = Depends(g
         "markers": data["markers"],
         "summary": data["summary"],
         "questions": data["questions"],
-        "questions_enabled": bool(clinic and clinic.patient_qa_enabled),
+        "questions_enabled": bool(clinic and clinic.patient_qa_enabled and settings.patient_qa_safety_verified),
     }
 
 
@@ -660,7 +665,7 @@ def patient_question(payload: PatientQuestionIn, request: Request, db: Session =
     check_rate_limit(db, request, "patient_qa", max_attempts=20, window_seconds=3600)
     packet = open_patient_packet(db, payload.token)
     clinic = db.get(Clinic, packet.clinic_id)
-    if clinic is None or not clinic.patient_qa_enabled:
+    if clinic is None or not clinic.patient_qa_enabled or not settings.patient_qa_safety_verified:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your clinic hasn't turned on questions. Please ask your care team.")
     day_ago = datetime.now(timezone.utc) - timedelta(days=1)
     asked_today = len(db.scalars(select(PatientQuestion.id).where(PatientQuestion.packet_id == packet.id, PatientQuestion.created_at >= day_ago)).all())

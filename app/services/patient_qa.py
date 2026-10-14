@@ -49,7 +49,7 @@ EXTRA_UNSAFE = re.compile(
     r"glp-?1|sglt2|injections?|shots?|infusions?|"
     r"in the clear|(?:you'?ll|you will) be (?:fine|ok|okay|alright)|likely nothing|probably nothing|no cause for (?:alarm|concern)|"
     r"reassur\w*|not a big deal|no big deal|harmless|not at risk|low risk|high risk|"
-    r"walk(?:ing)? \d+|keto|intermittent fasting|fasting|cinnamon|berberine|herbal|tea|home remed\w*|natural remed\w*|consider|"
+    r"walk(?:ing)? \d+|keto|intermittent fasting|cinnamon|berberine|herbal|tea|home remed\w*|natural remed\w*|"
     r"type (?:1|2|i|ii)\b|t[12]d|dm|ckd|cad|chf|copd|"
     r"(?:pancreas|kidneys?|liver|heart|thyroid|body) (?:may be |might be |is |are )?(?:struggling|failing|damaged|not working|working hard))\b",
     re.I,
@@ -196,4 +196,5 @@ def passed_safety_check(raw: str) -> bool:
         pairs = json.loads(text, object_pairs_hook=lambda items: items)
     except ValueError:
         return False
-    return pairs == [("safe", True)]
+    # `is True` so {"safe": 1} fails too (1 == True in Python).
+    return isinstance(pairs, list) and len(pairs) == 1 and pairs[0][0] == "safe" and pairs[0][1] is True

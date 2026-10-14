@@ -128,6 +128,7 @@ def clinic_out(clinic: Clinic, member: ClinicMember) -> dict:
         "retention_days": clinic.retention_days,
         "clinician_name": member.display_name,
         "member_role": member.role,
+        "patient_qa_enabled": bool(clinic.patient_qa_enabled),
     }
 
 
@@ -370,6 +371,13 @@ def update_settings(
         for key, value in (("name", payload.name.strip()), ("tone", payload.tone), ("retention_days", payload.retention_days))
         if getattr(clinic, key) != value
     }
+    if payload.patient_qa_enabled and not settings.patient_qa_safety_verified:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Patient questions can't be turned on yet: the safety check hasn't been completed.",
+        )
+    if payload.patient_qa_enabled is not None and bool(clinic.patient_qa_enabled) != payload.patient_qa_enabled:
+        changes["patient_qa_enabled"] = int(payload.patient_qa_enabled)
     for key, value in changes.items():
         setattr(clinic, key, value)
     if changes:
@@ -632,6 +640,7 @@ def view_packet(payload: PacketViewIn, request: Request, db: Session = Depends(g
         "markers": data["markers"],
         "summary": data["summary"],
         "questions": data["questions"],
+        "questions_enabled": bool(clinic and clinic.patient_qa_enabled and settings.patient_qa_safety_verified),
     }
 
 
@@ -655,6 +664,9 @@ def patient_question(payload: PatientQuestionIn, request: Request, db: Session =
 
     check_rate_limit(db, request, "patient_qa", max_attempts=20, window_seconds=3600)
     packet = open_patient_packet(db, payload.token)
+    clinic = db.get(Clinic, packet.clinic_id)
+    if clinic is None or not clinic.patient_qa_enabled or not settings.patient_qa_safety_verified:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Your clinic hasn't turned on questions. Please ask your care team.")
     day_ago = datetime.now(timezone.utc) - timedelta(days=1)
     asked_today = len(db.scalars(select(PatientQuestion.id).where(PatientQuestion.packet_id == packet.id, PatientQuestion.created_at >= day_ago)).all())
     if asked_today >= QA_PER_PACKET_PER_DAY:
@@ -686,7 +698,8 @@ def patient_question(payload: PatientQuestionIn, request: Request, db: Session =
                 model=settings.assistant_model,
                 max_tokens=1500,
                 system=patient_qa.SYSTEM_PROMPT,
-                messages=[{"role": "user", "content": patient_qa.user_message(question, sources)}],
+                # Names, birth dates and contact details the patient types are removed first.
+                messages=[{"role": "user", "content": patient_qa.user_message(deidentify_text(question), sources)}],
                 output_config={"effort": "low"},
                 betas=["server-side-fallback-2026-07-01"],
                 fallbacks="default",
@@ -700,6 +713,25 @@ def patient_question(payload: PatientQuestionIn, request: Request, db: Session =
         else:
             raw = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
             result = patient_qa.parse_answer(raw, sources)
+            if not result["deflect_to_doctor"]:
+                # A second, independent check; any doubt or error means "ask your doctor".
+                try:
+                    check = assistant.get_client().beta.messages.create(
+                        model=settings.assistant_model,
+                        max_tokens=200,
+                        system=patient_qa.SAFETY_PROMPT,
+                        messages=[{"role": "user", "content": patient_qa.safety_message(result["answer"], sources)}],
+                        output_config={"effort": "low"},
+                        betas=["server-side-fallback-2026-07-01"],
+                        fallbacks="default",
+                    )
+                    verdict = "".join(block.text for block in check.content if getattr(block, "type", "") == "text")
+                    safe = getattr(check, "stop_reason", "") != "refusal" and patient_qa.passed_safety_check(verdict)
+                except Exception as exc:  # noqa: BLE001 - fail closed
+                    qa_log.warning("patient answer check failed: %s", type(exc).__name__)
+                    safe = False
+                if not safe:
+                    result = {**patient_qa.deflection("outside"), "reason": "failed_check"}
     db.add(PatientQuestion(
         packet_id=packet.id,
         clinic_id=packet.clinic_id,

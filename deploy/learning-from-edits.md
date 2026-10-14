@@ -40,3 +40,13 @@ with exact values can still identify someone.
    than prod), canary on 10% of drafts, and a person signs off before promotion.
 5. Never: learning in the request path, cross-clinic learning without consent and legal
    review, or sending any unapproved model output to a patient.
+
+## Before any clinic turns on patient questions
+
+Patient Q&A is off for every clinic until its owner turns it on. Before the first clinic
+does, run the real-model safety check: add the CAREWISE_ANTHROPIC_API_KEY repository
+secret, then GitHub, Actions, "Patient Q&A safety check", Run workflow. It must report
+every unsafe answer blocked. Run it again after any change to the Q&A prompts.
+Questions stay locked in code until that check passes: only then set
+CAREWISE_PATIENT_QA_SAFETY_VERIFIED=true on the API service in Render. Until it is set,
+the clinic setting can't be turned on and patient links never show the question box.

@@ -30,7 +30,7 @@ def clinic_with_owner(client):
     return headers, email, clinic
 
 
-def raw_email(sender, to, subject="DEID JD-1042 lipids", attach=True):
+def raw_email(sender, to, subject="DEID REF-1042 lipids", attach=True):
     message = EmailMessage()
     message["From"] = f"Dr. Lee <{sender}>"
     message["To"] = to
@@ -52,7 +52,7 @@ def test_forwarded_lab_lands_encrypted_in_clinic_inbox_and_drafts_on_screen():
         assert posted.json() == {"status": "accepted", "labs": 1}
 
         inbox = client.get(f"/clinics/{clinic['id']}/packets", headers=headers).json()
-        assert inbox[0]["status"] == "new" and inbox[0]["source"] == "email" and inbox[0]["patient_ref"] == "JD-1042"
+        assert inbox[0]["status"] == "new" and inbox[0]["source"] == "email" and inbox[0]["patient_ref"] == "REF-1042"
         packet_id = inbox[0]["id"]
         source = client.get(f"/clinics/{clinic['id']}/packets/{packet_id}/source", headers=headers).json()["text"]
         assert "LDL Chol Calc" in source
@@ -106,8 +106,8 @@ def test_amazon_ses_notification_format():
             "Type": "Notification",
             "Message": json.dumps({
                 "receipt": {"action": {"type": "SNS", "encoding": "BASE64"}},
-                "content": base64.b64encode(raw_email(email, clinic["intake_address"], subject="Fwd: DEID AB-7")).decode(),
+                "content": base64.b64encode(raw_email(email, clinic["intake_address"], subject="Fwd: DEID REF-700")).decode(),
             }),
         }
         assert client.post("/inbound/email/intake-secret", json=notification).json()["labs"] == 1
-        assert client.get(f"/clinics/{clinic['id']}/packets", headers=headers).json()[0]["patient_ref"] == "AB-7"
+        assert client.get(f"/clinics/{clinic['id']}/packets", headers=headers).json()[0]["patient_ref"] == "REF-700"

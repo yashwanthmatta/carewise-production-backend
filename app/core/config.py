@@ -59,6 +59,11 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("CAREWISE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
     )
     assistant_model: str = "claude-opus-5-5"
+    # Set to true only after the "Patient Q&A safety check" workflow passes against the live model.
+    patient_qa_safety_verified: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("CAREWISE_PATIENT_QA_SAFETY_VERIFIED", "PATIENT_QA_SAFETY_VERIFIED"),
+    )
     stripe_secret_key: str = Field(
         default="",
         validation_alias=AliasChoices("CAREWISE_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"),

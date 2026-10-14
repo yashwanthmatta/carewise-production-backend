@@ -5,7 +5,6 @@ import logging
 import re
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
 from email import policy
 from email.message import EmailMessage
 from email.parser import BytesParser
@@ -37,7 +36,6 @@ MAX_ATTACHMENTS = 5
 MAX_PDF_BYTES = 10 * 1024 * 1024
 MAX_RAW_BYTES = 40 * 1024 * 1024
 CODE_PATTERN = re.compile(r"^(?:labs\+)?([a-z0-9]{8,24})$")
-REF_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,29}")
 SUBJECT_NOISE = re.compile(r"^\s*((fwd?|fw|re)\s*:\s*)+", re.IGNORECASE)
 
 
@@ -103,10 +101,19 @@ def recipient_codes(message: EmailMessage) -> list[str]:
     return codes
 
 
-def patient_ref_from(subject: str) -> str:
-    rest = re.sub(r"\bdeid\b", " ", SUBJECT_NOISE.sub("", subject or ""), flags=re.IGNORECASE)
-    match = REF_PATTERN.search(rest.strip(" :-[]()"))
-    return match.group(0) if match else f"EMAIL-{datetime.now(timezone.utc):%Y%m%d}"
+# The only patient code accepted from a subject is REF- and 3-10 digits right after DEID
+# ("DEID REF-1042"), the format the DocBridge screen asks for. Lab names, values and
+# dates ("LDL-100", "Oct-2026", "A1C") never count; without a code each lab gets its own.
+EXPLICIT_REF = re.compile(r"^REF-\d{3,10}$", re.IGNORECASE)
+
+
+def patient_ref_from(subject: str) -> str | None:
+    rest = SUBJECT_NOISE.sub("", subject or "")
+    match = re.search(r"\bdeid\b[\s:\-–]*([^\s,;]+)", rest, re.IGNORECASE)
+    if not match:
+        return None
+    word = match.group(1).strip(" :-[]()")
+    return word.upper() if EXPLICIT_REF.match(word) else None
 
 
 def pdf_attachments(message: EmailMessage) -> list[tuple[str, bytes]]:
@@ -153,7 +160,7 @@ def process_message(db: Session, raw: bytes) -> dict:
         packet = LabPacket(
             clinic_id=clinic.id,
             patient_ref_hash="",
-            encrypted_patient_ref=encrypt_field(patient_ref),
+            encrypted_patient_ref="",
             status="new" if text.strip() else "manual_review",
             created_by=member.user_id,
             source="email",
@@ -161,9 +168,12 @@ def process_message(db: Session, raw: bytes) -> dict:
         )
         from app.api.routes.clinics import ref_hash  # shared patient-reference hashing
 
-        packet.patient_ref_hash = ref_hash(clinic.id, patient_ref)
         db.add(packet)
         db.flush()
+        # No code in the subject: give this lab its own code so it never shares history.
+        own_ref = patient_ref or f"EMAIL-{packet.id[-8:].upper()}"
+        packet.encrypted_patient_ref = encrypt_field(own_ref)
+        packet.patient_ref_hash = ref_hash(clinic.id, own_ref)
         packet.file_key = f"intake/{clinic.id}/{packet.id}.pdf.enc"
         store_private_bytes(packet.file_key, encrypt_bytes(data))
         write_audit(

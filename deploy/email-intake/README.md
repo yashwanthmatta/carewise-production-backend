@@ -24,7 +24,7 @@ must contain `DEID`, at most 5 PDFs of 10 MB each. Anything else is dropped unst
 5. Email Routing, Routing rules, Catch-all for `in.<your domain>`: action "Send to a
    Worker", pick the Worker.
 6. Test: from the email address of a clinic member, send a sample lab PDF to the clinic
-   address with a subject like `DEID TEST-1`. It appears in the clinic inbox within a
+   address with a subject like `DEID REF-101`. It appears in the clinic inbox within a
    minute (the first request can be slower while a free server wakes up).
 
 Use only sample or de-identified labs until BAAs are signed. Cloudflare Email Routing is

@@ -397,6 +397,7 @@ class ClinicOut(BaseModel):
     clinician_name: str
     member_role: str
     intake_address: str = ""
+    patient_qa_enabled: bool = False
 
 
 class LabMarker(BaseModel):
@@ -468,6 +469,7 @@ class ClinicSettingsIn(BaseModel):
     name: str = Field(min_length=2, max_length=160)
     tone: str = Field(default="friendly", pattern="^(friendly|formal)$")
     retention_days: int = Field(default=90, ge=30, le=365)
+    patient_qa_enabled: bool | None = None
 
 
 class ClinicMemberRoleIn(BaseModel):

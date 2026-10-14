@@ -318,6 +318,8 @@ class Clinic(Base):
     name: Mapped[str] = mapped_column(String(160))
     tone: Mapped[str] = mapped_column(String(20), default="friendly")
     retention_days: Mapped[int] = mapped_column(Integer, default=90)
+    # Patient follow-up questions on approved links; off until the owner turns them on.
+    patient_qa_enabled: Mapped[int] = mapped_column(Integer, default=0)
     # Private part of the clinic's lab intake email address (labs+CODE@...).
     intake_code: Mapped[str | None] = mapped_column(String(24), unique=True, index=True, nullable=True)
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)

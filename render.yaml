@@ -43,6 +43,8 @@ services:
         value: "10485760"
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: CAREWISE_PATIENT_QA_SAFETY_VERIFIED
+        sync: false
       - key: CAREWISE_TWILIO_ACCOUNT_SID
         sync: false
       - key: CAREWISE_TWILIO_AUTH_TOKEN

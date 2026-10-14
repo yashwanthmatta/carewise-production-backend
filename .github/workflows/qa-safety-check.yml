@@ -1,0 +1,21 @@
+name: Patient Q&A safety check
+
+# Run by hand before any clinic turns patient questions on, and after any change to the
+# Q&A prompts. Needs the CAREWISE_ANTHROPIC_API_KEY repository secret.
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e .
+      - name: Check unsafe answers are blocked by the real model
+        env:
+          CAREWISE_ANTHROPIC_API_KEY: ${{ secrets.CAREWISE_ANTHROPIC_API_KEY }}
+        run: python scripts/check_patient_qa_safety.py

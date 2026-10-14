@@ -101,11 +101,10 @@ def recipient_codes(message: EmailMessage) -> list[str]:
     return codes
 
 
-# A patient code in the subject must look like one: letters, a dash, then 3+ digits,
-# right after DEID ("DEID JD-1042"). Lab names and dates ("A1C", "B12", "CMP-14",
-# "10/14") never count, so two patients can't end up under the same code.
-EXPLICIT_REF = re.compile(r"^[A-Za-z]{1,6}-\d{3,10}$")
-LAB_WORDS = {"cmp", "bmp", "cbc", "lft", "tsh", "a1c", "hba1c", "lipid", "lipids", "panel", "labs", "lab"}
+# The only patient code accepted from a subject is REF- and 3-10 digits right after DEID
+# ("DEID REF-1042"), the format the DocBridge screen asks for. Lab names, values and
+# dates ("LDL-100", "Oct-2026", "A1C") never count; without a code each lab gets its own.
+EXPLICIT_REF = re.compile(r"^REF-\d{3,10}$", re.IGNORECASE)
 
 
 def patient_ref_from(subject: str) -> str | None:
@@ -114,9 +113,7 @@ def patient_ref_from(subject: str) -> str | None:
     if not match:
         return None
     word = match.group(1).strip(" :-[]()")
-    if not EXPLICIT_REF.match(word) or word.split("-")[0].lower() in LAB_WORDS:
-        return None
-    return word
+    return word.upper() if EXPLICIT_REF.match(word) else None
 
 
 def pdf_attachments(message: EmailMessage) -> list[tuple[str, bytes]]:

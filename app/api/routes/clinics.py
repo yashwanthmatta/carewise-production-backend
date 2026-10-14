@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.core.crypto import decrypt_field, encrypt_field
 from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
-from app.models.carewise import AuditEvent, Clinic, ClinicInvite, ClinicMember, LabPacket
+from app.models.carewise import AuditEvent, Clinic, ClinicInvite, ClinicMember, DraftEdit, LabPacket
 from app.schemas.carewise import (
     ClinicIn,
     ClinicInviteIn,
@@ -29,6 +29,8 @@ from app.schemas.carewise import (
     PacketViewIn,
 )
 from app.services.audit import write_audit
+from app.services.deidentify import deidentify_text, year_only
+from app.services.draft_edits import record_draft_edit
 from app.services.rate_limit import check_rate_limit
 
 # DocBridge: a clinic uploads a lab, FollowThrough Health drafts the patient explanation on the
@@ -173,6 +175,9 @@ def create_packet(
         encrypted_summary=encrypt_field(payload.summary.strip()),
         encrypted_draft=encrypt_field(payload.summary.strip()),
         encrypted_questions=encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()])),
+        encrypted_draft_questions=encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()])),
+        model_version=payload.model_version,
+        prompt_version=payload.prompt_version,
         # Nothing could be read: a person types the values in, never a guess.
         status="draft" if payload.markers else "manual_review",
         created_by=user.user_id,
@@ -219,6 +224,11 @@ def edit_packet(
         # later compares against it to record whether the clinician edited it.
         packet.status = "draft" if payload.markers else "manual_review"
         packet.encrypted_draft = packet.encrypted_summary
+        packet.encrypted_draft_questions = packet.encrypted_questions
+        packet.model_version = payload.model_version or packet.model_version
+        packet.prompt_version = payload.prompt_version or packet.prompt_version
+    else:
+        record_draft_edit(db, packet, user.user_id, payload.summary, payload.questions, approved=False)
     write_audit(db, user.user_id, "", "packet_drafted" if first_draft else "packet_edited", "lab_packet", packet.id, {"clinic_id": clinic_id})
     db.commit()
     db.refresh(packet)
@@ -245,6 +255,7 @@ def approve_packet(
     now = datetime.now(timezone.utc)
     token = secrets.token_urlsafe(32)
     packet.edited = int(payload.summary.strip() != decrypt_field(packet.encrypted_draft).strip())
+    edit = record_draft_edit(db, packet, user.user_id, payload.summary, payload.questions, approved=True)
     packet.encrypted_summary = encrypt_field(payload.summary.strip())
     packet.encrypted_questions = encrypt_field(json.dumps([q.strip() for q in payload.questions if q.strip()]))
     packet.status = "approved"
@@ -256,7 +267,7 @@ def approve_packet(
     packet.expires_at = now + timedelta(days=PATIENT_LINK_DAYS)
     write_audit(
         db, user.user_id, "", "packet_approved", "lab_packet", packet.id,
-        {"review_seconds": packet.review_seconds, "edited": bool(packet.edited), "by": member.display_name, "clinic_id": clinic_id},
+        {"review_seconds": packet.review_seconds, "edited": bool(packet.edited), "edit_distance": edit.edit_distance, "by": member.display_name, "clinic_id": clinic_id},
     )
     db.commit()
     db.refresh(packet)
@@ -316,6 +327,7 @@ ACTION_LABELS = {
     "clinic_member_removed": "Team member removed",
     "clinic_member_left": "Left the clinic",
     "visit_summary_viewed": "Visit summary opened",
+    "training_export": "De-identified edit pairs downloaded",
     "audit_exported": "Audit log downloaded",
     "retention_purge": "Old labs deleted (retention)",
 }
@@ -521,7 +533,77 @@ def clinic_metrics(clinic_id: str, user: CurrentUser = Depends(get_current_user)
         "approved_this_week": len(this_week),
         "median_review_seconds": int(statistics.median(reviews)) if reviews else None,
         "patients_opened": sum(1 for p in approved if p.patient_viewed_at is not None),
+        "approved_without_edits": sum(1 for p in approved if p.edited == 0),
     }
+
+
+@router.get("/{clinic_id}/edit-metrics")
+def edit_metrics(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    # How much doctors change drafts, per draft generator and week. Lower edit distance
+    # and more approvals without edits mean the drafts are getting closer to what
+    # doctors want.
+    membership(db, user, clinic_id)
+    edits = db.scalars(select(DraftEdit).where(DraftEdit.clinic_id == clinic_id)).all()
+    groups: dict[tuple[str, str], list[DraftEdit]] = {}
+    for edit in edits:
+        created = as_utc(edit.created_at) or datetime.now(timezone.utc)
+        year, week, _ = created.isocalendar()
+        groups.setdefault((edit.model_version, f"{year}-W{week:02d}"), []).append(edit)
+    rows = []
+    for (version, week), items in sorted(groups.items(), key=lambda kv: (kv[0][1], kv[0][0])):
+        approvals = [e for e in items if e.event == "approve"]
+        zero = sum(e.zero_edit_approval for e in approvals)
+        rows.append({
+            "model_version": version,
+            "week": week,
+            "approvals": len(approvals),
+            "approval_without_edit_rate": round(zero / len(approvals), 3) if approvals else None,
+            "mean_edit_distance": round(statistics.mean(e.edit_distance for e in approvals), 1) if approvals else None,
+            "saves": len(items) - len(approvals),
+        })
+    return {"weeks": rows, "pairs_collected_total": sum(1 for e in edits if e.edit_distance > 0), "edits_recorded_total": len(edits)}
+
+
+@router.get("/{clinic_id}/training-pairs.jsonl")
+def training_pairs_export(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    # Owner only. De-identified (original draft, doctor's version) pairs for prompt
+    # review and, once a BAA is in place, fine-tuning. Lab values stay; identifiers go.
+    clinic, member = membership(db, user, clinic_id)
+    if member.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the clinic owner can download training pairs.")
+    packets = {p.id: p for p in db.scalars(select(LabPacket).where(LabPacket.clinic_id == clinic_id))}
+    names = [clinic.name] + [m.display_name for m in db.scalars(select(ClinicMember).where(ClinicMember.clinic_id == clinic_id))]
+    lines = []
+    for edit in db.scalars(select(DraftEdit).where(DraftEdit.clinic_id == clinic_id).order_by(DraftEdit.created_at)):
+        packet = packets.get(edit.packet_id)
+        if packet is None:
+            continue
+        known = names + [decrypt_field(packet.encrypted_patient_ref)]
+        markers = [
+            {k: deidentify_text(str(m.get(k, "")), known) for k in ("name", "value", "unit", "range", "status")}
+            for m in load_json(packet.encrypted_markers, [])
+        ]
+        original = deidentify_text(decrypt_field(edit.encrypted_original_text), known)
+        edited = deidentify_text(decrypt_field(edit.encrypted_edited_text), known)
+        lines.append(json.dumps({
+            "prompt": {"lab_year": year_only(packet.lab_date), "markers": markers, "tone": clinic.tone or "friendly"},
+            "chosen": edited,
+            "rejected": original,
+            "event": edit.event,
+            "zero_edit_approval": bool(edit.zero_edit_approval),
+            "edited_sections": json.loads(edit.edited_sections or "{}"),
+            "edit_distance": edit.edit_distance,
+            "model_version": edit.model_version,
+            "prompt_version": edit.prompt_version,
+            "week": "{}-W{:02d}".format(*(as_utc(edit.created_at) or datetime.now(timezone.utc)).isocalendar()[:2]),
+        }))
+    write_audit(db, user.user_id, "", "training_export", "clinic", clinic_id, {"pairs": len(lines), "clinic_id": clinic_id})
+    db.commit()
+    return Response(
+        content="\n".join(lines) + ("\n" if lines else ""),
+        media_type="application/x-ndjson",
+        headers={"Content-Disposition": 'attachment; filename="docbridge-training-pairs.jsonl"', "Cache-Control": "no-store"},
+    )
 
 
 # Patient side: the approved explanation, opened from the private link. No account.

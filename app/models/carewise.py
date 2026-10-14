@@ -362,9 +362,48 @@ class LabPacket(Base):
     source: Mapped[str] = mapped_column(String(10), default="manual")
     encrypted_source_text: Mapped[str] = mapped_column(Text, default="")
     file_key: Mapped[str] = mapped_column(String(300), default="")
+    # The draft questions as first generated, and what generated the draft, so every
+    # later save or approval can be stored as an (original, edited) pair.
+    encrypted_draft_questions: Mapped[str] = mapped_column(Text, default="")
+    model_version: Mapped[str] = mapped_column(String(80), default="")
+    prompt_version: Mapped[str] = mapped_column(String(80), default="")
     patient_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DraftEdit(Base):
+    # One doctor save or approval of a draft: the original draft and the doctor's
+    # version, a preference pair for improving drafts later. Text stays encrypted and is
+    # deleted with its lab (retention or account deletion). draft_id and lab_report_id in
+    # the spec are both the LabPacket here.
+    __tablename__ = "draft_edits"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("edit"))
+    packet_id: Mapped[str] = mapped_column(String(80), index=True)
+    clinic_id: Mapped[str] = mapped_column(String(80), index=True)
+    doctor_id: Mapped[str] = mapped_column(String(80), default="")
+    event: Mapped[str] = mapped_column(String(10), default="save")  # "save" or "approve"
+    encrypted_original_text: Mapped[str] = mapped_column(Text, default="")
+    encrypted_edited_text: Mapped[str] = mapped_column(Text, default="")
+    edited_sections: Mapped[str] = mapped_column(Text, default="{}")
+    edit_distance: Mapped[int] = mapped_column(Integer, default=0)
+    zero_edit_approval: Mapped[int] = mapped_column(Integer, default=0)
+    model_version: Mapped[str] = mapped_column(String(80), default="")
+    prompt_version: Mapped[str] = mapped_column(String(80), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
+class ModelVersion(Base):
+    # Which generator wrote a draft. A person changes status; nothing is promoted automatically.
+    __tablename__ = "model_versions"
+
+    version: Mapped[str] = mapped_column(String(80), primary_key=True)
+    base_model: Mapped[str] = mapped_column(String(120), default="")
+    training_pairs_count: Mapped[int] = mapped_column(Integer, default=0)
+    training_cutoff: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(10), default="canary")  # canary / prod / retired
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ClinicInvite(Base):

@@ -415,6 +415,9 @@ class LabPacketIn(BaseModel):
     summary: str = Field(default="", max_length=6000)
     questions: list[str] = Field(default_factory=list, max_length=10)
     deidentified_confirmed: bool = False
+    # What generated the draft (stored with every doctor edit of it).
+    model_version: str = Field(default="docbridge-rules-v1", pattern=r"^[a-z0-9._-]{1,80}$")
+    prompt_version: str = Field(default="docbridge-draft-v1", pattern=r"^[a-z0-9._-]{1,80}$")
 
 
 class LabPacketEditIn(BaseModel):
@@ -423,6 +426,8 @@ class LabPacketEditIn(BaseModel):
     # Filled once from the clinician's screen for labs that arrived by email.
     markers: list["LabMarker"] | None = Field(default=None, max_length=80)
     lab_date: str | None = Field(default=None, pattern=r"^(\d{4}-\d{2}-\d{2})?$")
+    model_version: str | None = Field(default=None, pattern=r"^[a-z0-9._-]{1,80}$")
+    prompt_version: str | None = Field(default=None, pattern=r"^[a-z0-9._-]{1,80}$")
 
 
 class LabPacketOut(BaseModel):

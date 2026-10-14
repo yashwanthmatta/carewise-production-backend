@@ -14,32 +14,41 @@ from app.core.config import settings
 
 VOICES = {"en": ("Polly.Joanna", "en-US"), "es": ("Polly.Lupe", "es-US")}
 
+# Written for an older listener: short sentences, who is calling first, the action before
+# the key, and how to stop. The Spanish lines are a draft waiting for review by a native speaker.
 SCRIPTS = {
     "en": {
-        "consent": "Hello. This is FollowThrough Health. {caller} set up phone calls to remind you when it is time for your medicine. "
-        "To agree to these reminder calls, press 1. If you do not want them, press 9.",
-        "dose": "Hello, this is FollowThrough Health, with a reminder from {caller}. It is time for your medicine. "
+        "consent": "Hello. This is an automated call from FollowThrough Health. "
+        "{caller} asked us to call you when it is time for your medicine. Is that okay? "
+        "To say yes, press 1. To say no, press 9. To hear this again, press 2.",
+        "dose": "Hello. This is FollowThrough Health, with a reminder from {caller}. It is time for your medicine. "
         "If you have taken it, press 1. To hear this again, press 2. To stop these calls, press 9.",
-        "consent_yes": "Thank you. You will get a call at each reminder time. Goodbye.",
+        "consent_yes": "Thank you. We will call you at each reminder time. "
+        "To stop the calls, press 9 during any call. Goodbye.",
         "taken": "Thank you. We will let {caller} know. Goodbye.",
-        "stopped": "These reminder calls are now turned off. Goodbye.",
-        "no_answer": "We did not hear an answer. Goodbye.",
+        "stopped": "Okay. These reminder calls are now turned off. You will not get any more. Goodbye.",
+        "no_answer": "We did not hear a button press. Goodbye for now.",
         "unknown": "This reminder is no longer active. Goodbye.",
         "family": "your family",
     },
     "es": {
-        "consent": "Hola. Le llama FollowThrough Health. {caller} programó llamadas para recordarle cuándo tomar su medicina. "
-        "Para aceptar estas llamadas, marque 1. Si no las desea, marque 9.",
-        "dose": "Hola, le llama FollowThrough Health con un recordatorio de {caller}. Es hora de tomar su medicina. "
+        "consent": "Hola. Esta es una llamada automática de FollowThrough Health. "
+        "{caller} nos pidió llamarle cuando sea hora de tomar su medicina. ¿Está de acuerdo? "
+        "Para decir que sí, marque 1. Para decir que no, marque 9. Para escuchar de nuevo, marque 2.",
+        "dose": "Hola. Le llama FollowThrough Health con un recordatorio de {caller}. Es hora de tomar su medicina. "
         "Si ya la tomó, marque 1. Para escuchar de nuevo, marque 2. Para dejar de recibir estas llamadas, marque 9.",
-        "consent_yes": "Gracias. Recibirá una llamada a cada hora del recordatorio. Adiós.",
+        "consent_yes": "Gracias. Le llamaremos a cada hora del recordatorio. "
+        "Para dejar de recibir las llamadas, marque 9 durante cualquier llamada. Adiós.",
         "taken": "Gracias. Se lo diremos a {caller}. Adiós.",
-        "stopped": "Las llamadas de recordatorio están desactivadas. Adiós.",
-        "no_answer": "No escuchamos una respuesta. Adiós.",
+        "stopped": "Muy bien. Las llamadas de recordatorio están desactivadas. No recibirá más. Adiós.",
+        "no_answer": "No escuchamos ninguna tecla. Adiós por ahora.",
         "unknown": "Este recordatorio ya no está activo. Adiós.",
         "family": "su familia",
     },
 }
+
+# Polly voices read SSML inside <Say>; a slightly slower rate is easier to follow on a phone.
+SPEAKING_RATE = "90%"
 
 
 def script(language: str, key: str, caller: str = "") -> str:
@@ -49,7 +58,7 @@ def script(language: str, key: str, caller: str = "") -> str:
 
 def say(language: str, text: str) -> str:
     voice, lang = VOICES.get(language, VOICES["en"])
-    return f'<Say voice="{voice}" language="{lang}">{escape(text)}</Say>'
+    return f'<Say voice="{voice}" language="{lang}"><prosody rate="{SPEAKING_RATE}">{escape(text)}</prosody></Say>'
 
 
 def twiml(*parts: str) -> str:
@@ -57,9 +66,10 @@ def twiml(*parts: str) -> str:
 
 
 def gather_twiml(language: str, text: str, action_url: str) -> str:
-    # Ask once, ask again if there is no keypress, then hang up politely.
-    prompt = f'<Gather numDigits="1" timeout="8" method="POST" action="{escape(action_url)}">{say(language, text)}</Gather>'
-    return twiml(prompt, prompt, say(language, script(language, "no_answer")), "<Hangup/>")
+    # A short pause lets the person settle after "hello?". Ask once, ask again if there is
+    # no keypress (with time to find the keypad), then hang up politely.
+    prompt = f'<Gather numDigits="1" timeout="10" method="POST" action="{escape(action_url)}">{say(language, text)}</Gather>'
+    return twiml('<Pause length="1"/>', prompt, prompt, say(language, script(language, "no_answer")), "<Hangup/>")
 
 
 def goodbye_twiml(language: str, text: str) -> str:

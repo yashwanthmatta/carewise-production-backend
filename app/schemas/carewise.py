@@ -451,6 +451,11 @@ class LabPacketApprovedOut(LabPacketOut):
     patient_token: str
 
 
+class PatientQuestionIn(BaseModel):
+    token: str = Field(min_length=20, max_length=200)
+    question: str = Field(min_length=2, max_length=500)
+
+
 class PacketViewIn(BaseModel):
     token: str = Field(min_length=20, max_length=200)
 

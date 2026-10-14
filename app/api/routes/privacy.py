@@ -19,6 +19,7 @@ from app.models.carewise import (
     DoctorShare,
     MedicineReminder,
     ReminderEvent,
+    DraftEdit,
     LabPacket,
     EmailVerificationToken,
     Intake,
@@ -266,6 +267,7 @@ def delete_my_account_data(
                 delete_stored_file(key)
             except Exception:
                 pass
+        db.execute(delete(DraftEdit).where(DraftEdit.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(LabPacket).where(LabPacket.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(ClinicInvite).where(ClinicInvite.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(ClinicMember).where(ClinicMember.clinic_id.in_(owned_clinic_ids)))

@@ -283,4 +283,4 @@ def test_clinician_can_revoke_or_replace_a_patient_link():
         assert client.post("/clinics/packets/view", json={"token": second}).status_code == 404
         assert client.post("/clinics/packets/qa", json={"token": second, "question": "What was my LDL?"}).status_code == 404
         actions = [e["action"] for e in client.get(f"/clinics/{clinic_id}/packets/{pid}/audit", headers=owner).json()]
-        assert "patient_link_reissued" in actions and "patient_link_revoked" in actions
+        assert "New patient link created (old link turned off)" in actions and "Patient link turned off" in actions

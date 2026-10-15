@@ -438,6 +438,8 @@ class LabPacketOut(BaseModel):
     markers: list[dict]
     summary: str
     questions: list[str]
+    draft: str = ""
+    draft_questions: list[str] = []
     status: str
     approved_by_name: str
     approved_at: datetime | None
@@ -446,6 +448,7 @@ class LabPacketOut(BaseModel):
     edited: bool | None = None
     source: str = "manual"
     created_at: datetime | None
+    link_active: bool = False
 
 
 class LabPacketApprovedOut(LabPacketOut):

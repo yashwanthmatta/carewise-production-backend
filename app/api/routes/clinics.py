@@ -93,6 +93,9 @@ def packet_out(packet: LabPacket) -> dict:
         "markers": load_json(packet.encrypted_markers, []),
         "summary": decrypt_field(packet.encrypted_summary),
         "questions": load_json(packet.encrypted_questions, []),
+        # The draft as first generated, shown read-only beside the doctor's version.
+        "draft": decrypt_field(packet.encrypted_draft) if packet.encrypted_draft else "",
+        "draft_questions": load_json(packet.encrypted_draft_questions, []) if packet.encrypted_draft_questions else [],
         "status": packet.status,
         "approved_by_name": packet.approved_by_name,
         "approved_at": as_utc(packet.approved_at),
@@ -101,7 +104,13 @@ def packet_out(packet: LabPacket) -> dict:
         "edited": None if packet.edited is None else bool(packet.edited),
         "source": packet.source or "manual",
         "created_at": packet.created_at,
+        "link_active": link_active(packet),
     }
+
+
+def link_active(packet: LabPacket) -> bool:
+    expires = as_utc(packet.expires_at)
+    return packet.status == "approved" and bool(packet.patient_token_hash) and expires is not None and expires > datetime.now(timezone.utc)
 
 
 def require_approver(member: ClinicMember) -> None:
@@ -278,6 +287,40 @@ def approve_packet(
     return {**packet_out(packet), "patient_token": token}
 
 
+def approved_packet_for_link(db: Session, user: CurrentUser, clinic_id: str, packet_id: str) -> tuple[LabPacket, ClinicMember]:
+    _, member = membership(db, user, clinic_id)
+    require_approver(member)
+    packet = clinic_packet(db, clinic_id, packet_id)
+    if packet.status != "approved":
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only approved summaries have a patient link.")
+    return packet, member
+
+
+@router.post("/{clinic_id}/packets/{packet_id}/revoke-link", response_model=LabPacketOut)
+def revoke_patient_link(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    # For a link sent to the wrong person: it stops working at once, for everyone.
+    packet, member = approved_packet_for_link(db, user, clinic_id, packet_id)
+    packet.patient_token_hash = ""
+    packet.expires_at = datetime.now(timezone.utc)
+    write_audit(db, user.user_id, "", "patient_link_revoked", "lab_packet", packet.id, {"by": member.display_name, "clinic_id": clinic_id})
+    db.commit()
+    db.refresh(packet)
+    return packet_out(packet)
+
+
+@router.post("/{clinic_id}/packets/{packet_id}/new-link", response_model=LabPacketApprovedOut)
+def reissue_patient_link(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    # A fresh link for the same approved summary; any earlier link stops working.
+    packet, member = approved_packet_for_link(db, user, clinic_id, packet_id)
+    token = secrets.token_urlsafe(32)
+    packet.patient_token_hash = sha(token)
+    packet.expires_at = datetime.now(timezone.utc) + timedelta(days=PATIENT_LINK_DAYS)
+    write_audit(db, user.user_id, "", "patient_link_reissued", "lab_packet", packet.id, {"by": member.display_name, "clinic_id": clinic_id})
+    db.commit()
+    db.refresh(packet)
+    return {**packet_out(packet), "patient_token": token}
+
+
 @router.post("/{clinic_id}/packets/{packet_id}/follow-up", response_model=LabPacketOut)
 def mark_follow_up(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     membership(db, user, clinic_id)
@@ -316,6 +359,8 @@ ACTION_LABELS = {
     "packet_drafted": "Draft created",
     "packet_edited": "Draft edited",
     "packet_approved": "Approved and patient link created",
+    "patient_link_reissued": "New patient link created (old link turned off)",
+    "patient_link_revoked": "Patient link turned off",
     "packet_needs_call": "Marked as needs a follow-up call",
     "packet_rejected": "Rejected, not sent",
     "packet_viewed_by_patient": "Opened by the patient",

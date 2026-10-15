@@ -44,6 +44,8 @@ def test_draft_approve_and_patient_view():
         assert approved.status_code == 200
         body = approved.json()
         assert body["approved_by_name"] == "Dr. Lee"
+        assert body["draft"] == "Your LDL cholesterol is above the usual target."
+        assert body["summary"].startswith("Edited") and body["draft_questions"] == ["What LDL goal fits me?"]
         assert body["review_seconds"] is not None
 
         view = client.post("/clinics/packets/view", json={"token": body["patient_token"]})
@@ -175,6 +177,8 @@ def test_every_clinic_route_is_closed_to_other_clinics():
             ("post", f"/clinics/{clinic_id}/packets/{pid}/approve", {"summary": "x"}),
             ("post", f"/clinics/{clinic_id}/packets/{pid}/follow-up", {}),
             ("post", f"/clinics/{clinic_id}/packets/{pid}/reject", None),
+            ("post", f"/clinics/{clinic_id}/packets/{pid}/revoke-link", None),
+            ("post", f"/clinics/{clinic_id}/packets/{pid}/new-link", None),
             ("get", f"/clinics/{clinic_id}/packets/{pid}/audit", None),
             ("post", f"/clinics/{clinic_id}/invites", {"role": "clinician"}),
             ("get", f"/clinics/{clinic_id}/members", None),
@@ -243,3 +247,40 @@ def test_nightly_purge_deletes_old_labs_but_keeps_the_log(monkeypatch):
         assert client.post("/maintenance/purge", headers={"X-CareWise-Cron-Token": "cron-secret"}).json()["lab_packets"] == 0
         log = client.get(f"/clinics/{clinic_id}/audit.csv", headers=owner).text
         assert f"Lab {old['id'][-8:]}" in log and "Old labs deleted (retention)" in log and "FollowThrough Health (automatic)" in log
+
+
+def test_clinician_can_revoke_or_replace_a_patient_link():
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        packet = draft(client, owner, clinic_id)
+        pid = packet["id"]
+        assert client.post(f"/clinics/{clinic_id}/packets/{pid}/revoke-link", headers=owner).status_code == 409
+        approved = client.post(
+            f"/clinics/{clinic_id}/packets/{pid}/approve",
+            json={"summary": "Your LDL cholesterol is above the usual target.", "questions": []},
+            headers=owner,
+        ).json()
+        first = approved["patient_token"]
+        assert approved["link_active"] is True
+        assert client.post("/clinics/packets/view", json={"token": first}).status_code == 200
+
+        invite = client.post(f"/clinics/{clinic_id}/invites", json={"role": "front_desk"}, headers=owner).json()
+        desk, _ = auth_headers(client)
+        client.post("/clinics/join", json={"code": invite["code"], "display_name": "Sam"}, headers=desk)
+        assert client.post(f"/clinics/{clinic_id}/packets/{pid}/revoke-link", headers=desk).status_code == 403
+        assert client.post(f"/clinics/{clinic_id}/packets/{pid}/new-link", headers=desk).status_code == 403
+
+        fresh = client.post(f"/clinics/{clinic_id}/packets/{pid}/new-link", headers=owner)
+        assert fresh.status_code == 200
+        second = fresh.json()["patient_token"]
+        assert second != first and fresh.json()["link_active"] is True
+        assert client.post("/clinics/packets/view", json={"token": first}).status_code == 404
+        assert client.post("/clinics/packets/view", json={"token": second}).status_code == 200
+
+        revoked = client.post(f"/clinics/{clinic_id}/packets/{pid}/revoke-link", headers=owner)
+        assert revoked.status_code == 200 and revoked.json()["link_active"] is False
+        assert revoked.json()["status"] == "approved"
+        assert client.post("/clinics/packets/view", json={"token": second}).status_code == 404
+        assert client.post("/clinics/packets/qa", json={"token": second, "question": "What was my LDL?"}).status_code == 404
+        actions = [e["action"] for e in client.get(f"/clinics/{clinic_id}/packets/{pid}/audit", headers=owner).json()]
+        assert "patient_link_reissued" in actions and "patient_link_revoked" in actions

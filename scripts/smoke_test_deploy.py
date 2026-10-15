@@ -328,6 +328,7 @@ def main() -> int:
                     "stripe_checkout": features.get("stripe_checkout"),
                     "stripe_webhook": features.get("stripe_webhook"),
                     "help_assistant": features.get("help_assistant"),
+                    "patient_qa": features.get("patient_qa"),
                     "reminder_calls": features.get("reminder_calls"),
                     "reminder_dispatch": features.get("reminder_dispatch"),
                 },

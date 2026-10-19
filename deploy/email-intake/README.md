@@ -30,3 +30,18 @@ must contain `DEID`, at most 5 PDFs of 10 MB each. Anything else is dropped unst
 Use only sample or de-identified labs until BAAs are signed. Cloudflare Email Routing is
 fine for the pilot; switch to a provider that signs a BAA (for example Amazon SES, which
 the endpoint also accepts via SNS) before real patient data.
+
+## Scheduled jobs (reminder calls and nightly cleanup)
+
+The same Worker runs the scheduled jobs, because GitHub's scheduled workflows only ran
+every 2 to 6 hours in practice. A reminder is created only when its time falls in the
+last 15 minutes, so a slow schedule silently skips most reminders.
+
+1. Paste the current `cloudflare-email-worker.js` into the Worker and Deploy.
+2. Settings, Variables and Secrets: add secret `CRON_TOKEN` = the same value as
+   `CAREWISE_REMINDER_CRON_TOKEN` on the Render API service.
+3. Settings, Triggers, Cron Triggers: add `*/5 * * * *` and `17 7 * * *`.
+4. Check: Worker, Logs, a run every 5 minutes with no "returned" error lines.
+
+The GitHub workflow `scheduled-jobs.yml` stays as a backup; running the dispatch twice is
+safe (each reminder time is recorded once and calls count their attempts).

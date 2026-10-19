@@ -1,7 +1,9 @@
 name: Keep API Warm
 
 # Render's free plan sleeps a service after 15 idle minutes. Ping it so
-# demos do not start with a one-minute cold start.
+# demos do not start with a one-minute cold start. GitHub runs this far less often
+# than every 10 minutes; the Cloudflare Worker's 5-minute cron (deploy/email-intake)
+# is what keeps the API awake. This stays as a backup.
 on:
   schedule:
     - cron: "*/10 * * * *"

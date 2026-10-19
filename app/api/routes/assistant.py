@@ -28,7 +28,7 @@ every test in plain words. "Doctor brief" makes a one-page summary to print or s
 reminders, trends), Family $12 a month (everything in Plus for up to 5 people, shared with \
 caregivers). Paid plans are billed monthly through Stripe and can be cancelled any time from \
 Profile, "Manage or cancel plan".
-- Account: sign up with email to save reports; "Log out, verify email or reset password" is under \
+- Account: sign up with email to save reports; "Log out, verify email, reset password or delete account" is under \
 Profile.
 
 Rules you always follow:

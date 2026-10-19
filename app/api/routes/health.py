@@ -35,6 +35,7 @@ def features():
         "durable_storage": bool(storage_config["durable"]),
         "storage_ready": bool(storage_config["ready"]),
         "report_uploads": True,
+        "report_explanations": not settings.report_explanations_paused,
         "text_extraction": True,
         "pdf_text_extraction": True,
         "image_ocr": bool(settings.clean_env_value(settings.openai_api_key)),

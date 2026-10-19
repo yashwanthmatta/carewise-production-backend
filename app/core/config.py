@@ -60,6 +60,11 @@ class Settings(BaseSettings):
     )
     assistant_model: str = "claude-opus-5-5"
     # Set to true only after the "Patient Q&A safety check" workflow passes against the live model.
+    # Safety switch: set to true to pause report explanations in the website while a problem is checked.
+    report_explanations_paused: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("CAREWISE_REPORT_EXPLANATIONS_PAUSED", "REPORT_EXPLANATIONS_PAUSED"),
+    )
     patient_qa_safety_verified: bool = Field(
         default=False,
         validation_alias=AliasChoices("CAREWISE_PATIENT_QA_SAFETY_VERIFIED", "PATIENT_QA_SAFETY_VERIFIED"),

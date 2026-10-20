@@ -299,6 +299,7 @@ USAGE_EVENTS = (
     "doctor_brief_opened",
     "spanish_used",
     "early_access_opened",
+    "listen_used",
 )
 SIGNAL_SOURCES = ("web", "mobile")
 EARLY_ACCESS_ROLES = ("caregiver", "patient", "clinician", "other")

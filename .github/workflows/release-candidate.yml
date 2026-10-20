@@ -1,0 +1,57 @@
+# Creates an annotated release-candidate tag after checking the commit (and, for the app, the
+# explanation rules version). Run by hand: Actions -> Create release candidate -> Run workflow.
+# The release record lives in carewise-frontend docs/releases/.
+name: Create release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag name, e.g. clinical-review-candidate-2026-10-20.2"
+        required: true
+      commit:
+        description: "Full commit SHA to tag"
+        required: true
+      rules_version:
+        description: "Explanation rules version, e.g. 2026-10-20.2"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      COMMIT: ${{ inputs.commit }}
+      RULES: ${{ inputs.rules_version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the commit
+        run: |
+          set -euo pipefail
+          git cat-file -e "${COMMIT}^{commit}"
+          git merge-base --is-ancestor "$COMMIT" origin/main
+          git checkout --quiet "$COMMIT"
+
+          test "$(git tag -l "$TAG")" = ""
+
+      - name: Create annotated tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" "$COMMIT" -m "$TAG
+
+          Engineering validation completed. Clinical rules remain pending independent clinician
+          approval. This release is a candidate for clinical evaluation and does not establish
+          clinical safety or regulatory clearance.
+
+          Explanation rules version: ${RULES}
+          Release record: carewise-frontend docs/releases/${TAG}.md"
+          git push origin "refs/tags/$TAG"

@@ -12,12 +12,13 @@ def test_usage_events_are_daily_counts_only():
         for _ in range(3):
             assert client.post("/product/events", json={"name": "report_explained"}).status_code == 200
         assert client.post("/product/events", json={"name": "demo_started", "source": "mobile"}).status_code == 200
+        assert client.post("/product/events", json={"name": "listen_used"}).status_code == 200
         assert client.post("/product/events", json={"name": "anything_else"}).status_code == 422
 
     with SessionLocal() as db:
         rows = db.scalars(select(UsageCounter)).all()
         counts = {(row.name, row.source): row.count for row in rows}
-        assert counts == {("report_explained", "web"): 3, ("demo_started", "mobile"): 1}
+        assert counts == {("report_explained", "web"): 3, ("demo_started", "mobile"): 1, ("listen_used", "web"): 1}
 
 
 def test_feedback_comment_is_encrypted():

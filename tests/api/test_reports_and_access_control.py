@@ -315,3 +315,25 @@ def test_patient_cannot_access_another_patient_records():
             headers=other_headers,
         )
         assert blocked_text_update.status_code == 403
+
+
+def test_audit_log_does_not_record_report_file_names():
+    # People often name a file after the patient, so the audit log keeps only the action.
+    from sqlalchemy import select
+
+    from app.db.session import SessionLocal
+    from app.models.carewise import AuditEvent
+
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        patient_id = create_profile(client, headers)
+        response = client.post(
+            "/reports/upload",
+            json={"patient_id": patient_id, "file_name": "jane-doe-cholesterol.txt", "content_type": "text/plain", "report_text": "LDL 150"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+    with SessionLocal() as db:
+        events = db.scalars(select(AuditEvent).where(AuditEvent.action == "report_uploaded")).all()
+        assert events
+        assert all("jane-doe" not in (event.metadata_json or "") for event in events)

@@ -19,11 +19,18 @@ def test_public_signup_cannot_create_admin_or_clinician(monkeypatch):
         assert client.post("/auth/signup", json={"email": "p@example.com", "password": PASSWORD, "role": "patient"}).status_code == 200
 
 
+def verify_email(address: str) -> None:
+    with SessionLocal() as db:
+        db.scalar(select(User).where(User.email == address)).email_verified = "true"
+        db.commit()
+
+
 def test_listed_staff_can_sign_up_with_their_role(monkeypatch):
     monkeypatch.setattr(settings, "staff_emails", "doc@clinic.org:clinician, Boss@CareWise.app:admin")
     with TestClient(create_app()) as client:
         doctor = client.post("/auth/signup", json={"email": "doc@clinic.org", "password": PASSWORD, "role": "clinician"})
         assert doctor.status_code == 200
+        verify_email("doc@clinic.org")
         me = client.get("/auth/me", headers={"Authorization": f"Bearer {doctor.json()['access_token']}"})
         assert me.json()["role"] == "clinician"
         # Listed as clinician, so admin is still refused.
@@ -48,3 +55,22 @@ def test_existing_unlisted_staff_account_acts_as_patient(monkeypatch):
         assert client.get(f"/lab-trends?patient_id={patient_id}", headers=headers).status_code == 403
         with SessionLocal() as db:
             assert db.scalar(select(User).where(User.email == "sneaky@example.com")).role == "patient"
+
+
+def test_staff_role_waits_for_email_verification(monkeypatch):
+    # Someone who registers a listed staff address they do not own must not see
+    # other people's records before proving they own that address.
+    monkeypatch.setattr(settings, "staff_emails", "newdoc@clinic.org:clinician")
+    with TestClient(create_app()) as client:
+        patient_headers, _ = auth_headers(client)
+        patient_id = create_profile(client, patient_headers)
+        squatter = client.post("/auth/signup", json={"email": "newdoc@clinic.org", "password": PASSWORD, "role": "clinician"})
+        assert squatter.status_code == 200
+        headers = {"Authorization": f"Bearer {squatter.json()['access_token']}"}
+        assert client.get("/auth/me", headers=headers).json()["role"] == "patient"
+        assert client.get(f"/lab-trends?patient_id={patient_id}", headers=headers).status_code == 403
+        assert client.get(f"/reports?patient_id={patient_id}", headers=headers).status_code == 403
+
+        verify_email("newdoc@clinic.org")
+        assert client.get("/auth/me", headers=headers).json()["role"] == "clinician"
+        assert client.get(f"/lab-trends?patient_id={patient_id}", headers=headers).status_code == 200

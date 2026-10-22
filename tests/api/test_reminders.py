@@ -213,3 +213,19 @@ def test_call_scripts_are_clear_for_an_older_listener(language):
     body = reminder_calls.gather_twiml(language, reminder_calls.script(language, "dose"), "https://api.test/a")
     assert body.index('<Pause length="1"/>') < body.index("<Gather")
     assert 'timeout="10"' in body and '<prosody rate="90%">' in body
+
+
+def test_other_people_cannot_see_or_change_my_reminders():
+    with TestClient(create_app()) as client:
+        owner, _ = auth_headers(client)
+        other, _ = auth_headers(client)
+        reminder = client.post("/reminders", json=reminder_body(), headers=owner).json()
+        rid = reminder["id"]
+        assert client.get("/reminders", headers=other).json() == []
+        assert client.put(f"/reminders/{rid}", json=reminder_body(label="Changed"), headers=other).status_code == 404
+        assert client.post(f"/reminders/{rid}/taken", json={"time": "08:00"}, headers=other).status_code == 404
+        assert client.post(f"/reminders/{rid}/consent-call", json={}, headers=other).status_code in (404, 422)
+        assert client.delete(f"/reminders/{rid}", headers=other).status_code == 404
+        # Still there and unchanged for the owner.
+        mine = client.get("/reminders", headers=owner).json()
+        assert [item["label"] for item in mine] == ["Morning pills"]

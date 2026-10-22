@@ -79,6 +79,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             role = "patient"
             user.role = role
             db.commit()
+        elif role != "patient" and user.email_verified != "true":
+            # A staff role can see other people's records, so it only takes effect once
+            # the person has proved they own the listed email address. Until then the
+            # account acts as a patient; the stored role is kept for after verification.
+            role = "patient"
         return CurrentUser(
             user_id=user.id,
             email=user.email,

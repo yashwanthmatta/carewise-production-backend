@@ -42,7 +42,7 @@ def create_report_upload(
     )
     db.add(report)
     db.flush()
-    write_audit(db, user.user_id, payload.patient_id, "report_uploaded", "report", report.id, {"file_name": payload.file_name})
+    write_audit(db, user.user_id, payload.patient_id, "report_uploaded", "report", report.id, {})
     db.commit()
     return report_out(report)
 
@@ -79,7 +79,7 @@ async def create_report_file_upload(
         "report_file_uploaded",
         "report",
         report.id,
-        {"file_name": report.file_name, "file_size_bytes": stored_file.file_size_bytes},
+        {"file_size_bytes": stored_file.file_size_bytes},
     )
     db.commit()
     return report_out(report)
@@ -116,7 +116,7 @@ def get_report_download_url(
         "report_download_url_created",
         "report",
         report.id,
-        {"file_name": report.file_name},
+        {},
     )
     db.commit()
     return ReportDownloadOut(

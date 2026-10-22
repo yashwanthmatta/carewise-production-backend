@@ -19,7 +19,7 @@ cross-account tests; Render API configuration read-out; Render public documentat
 | M2 | All field encryption uses one static key held in a Render environment variable. There is no key version, rotation or managed key service. If the configured value is not a valid Fernet key, it is turned into one with a single SHA-256 hash, with no key-derivation function. | Medium | Design below |
 | M3 | The Render workspace is not HIPAA-enabled, so there is no Business Associate Agreement. The same applies to AWS S3, Anthropic and the email provider until agreements are signed. | Medium (legal) | Already pilot-only with de-identified/sample data; legal review |
 | M4 | Global clinician/admin roles can open **any** patient profile; access isn't limited to patients that person cares for. Two-step sign-in isn't required for staff. | Medium | Recommendation (section 6) |
-| L1 | The audit log stores uploaded file names, which people sometimes name after the patient. | Low | Recommendation |
+| L1 | The audit log stored uploaded file names, which people sometimes name after the patient. | Low | **Fixed** (new entries no longer include the name; older entries keep it until removed) |
 | L2 | Database has no high availability, a 1 GB disk with autoscaling off, and point-in-time recovery of 3 days (Hobby) or 7 days (Professional+). | Low (availability) | Recommendation |
 
 ## 2. H1 fix (in this PR)
@@ -59,7 +59,7 @@ documentation).
 | product_feedback, early_access | comments, email | feedback | yes |
 | lab_packets (DocBridge) | encrypted patient_ref, markers, summary, questions, draft, source text | clinic labs | yes; patient link stored as a hash |
 | draft_edits, patient_questions (DocBridge) | encrypted original/edited text, question/answer | doctor edits | yes (edited_sections, citations no) |
-| audit_events | action, metadata_json | who did what | no; checked: only counts, roles and file names, no values |
+| audit_events | action, metadata_json | who did what | no; checked: only counts and roles, no values (file names no longer recorded) |
 | notification_preferences | device_token | push token | **no** |
 
 The plaintext health columns that matter most are `report_analyses.summary_json` and

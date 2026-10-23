@@ -300,3 +300,25 @@ def test_reminder_follows_its_own_time_zone_not_the_server(calls):
         events = dose_events_for(db, created["id"])
         assert len(events) == 1
         assert reminder_routes.as_utc(events[0].due_at) == datetime(2026, 6, 1, 23, 0, tzinfo=timezone.utc)
+
+
+def test_health_flags_reminders_stuck_when_the_scheduler_stops(calls):
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    with TestClient(create_app()) as client:
+        assert client.get("/reminders/health").status_code == 403
+        headers, _ = auth_headers(client)
+        created = client.post(
+            "/reminders", json=reminder_body(times=[(now - timedelta(minutes=1)).strftime("%H:%M")]), headers=headers
+        ).json()
+    with SessionLocal() as db:
+        reminder_routes.run_dispatch(db, now)  # makes today's event, then the scheduler "stops"
+        assert len(dose_events_for(db, created["id"])) == 1
+        before = reminder_routes.reminder_health(db, now + timedelta(minutes=30))
+        after = reminder_routes.reminder_health(db, now + timedelta(hours=3))
+        assert after["stuck_events"] == before["stuck_events"] + 1 and not after["healthy"]
+        # Once the scheduler runs again the event is closed and no longer counted.
+        reminder_routes.run_dispatch(db, now + timedelta(hours=3))
+        assert reminder_routes.reminder_health(db, now + timedelta(hours=3))["stuck_events"] == before["stuck_events"]
+    with TestClient(create_app()) as client:
+        body = client.get("/reminders/health", headers={"X-CareWise-Cron-Token": "cron-secret"}).json()
+    assert set(body) == {"healthy", "stuck_events", "missed_last_24h"}

@@ -39,13 +39,14 @@ Twilio's own delivery result (rang, busy, no answer) is not read yet.
 - **Calendar times used the phone's time zone, not the reminder's.** Now pinned with `TZID`. Same PR.
 - **Weekday reminders added an extra one today** when today was not a chosen day. Same PR.
 - **Email said "we called" even when Twilio refused the call.** Now "we tried to call". The dispatcher also reports `call_failures`. Backend PR on branch `claude/agent-reminders`.
+- **Reminder health check.** New `GET /reminders/health` (cron token, counts only) and an hourly workflow `reminders-health.yml` that fails when a reminder is still open 2 hours after its time. Backend PR #44.
 - **Added tests** for daylight saving (fall back: one reminder, not two; spring forward: one reminder at 3:30), for reminders in another time zone than the server, and for Twilio failures.
 
 ## Known problems (highest first)
 
 1. **High: no real phone notifications.** The mobile app only shows a list. Nothing alerts the phone unless phone calls or the calendar file are used.
 2. **High: two separate reminder features on the website.** "Medicine reminders" (account) and "Reminder planner" (browser only, no alerts). Confusing, and planner items are lost when the browser is cleared.
-3. **Medium: failures are not alerted.** `call_failures` and missed counts show only in the Actions log. A failed scheduler run shows red in GitHub. Nobody is told about Twilio failures.
+3. **Medium: Twilio failures are not alerted.** `call_failures` shows only in the Actions log. A stopped scheduler is now caught by the hourly health check (after #44 is merged and deployed).
 4. **Medium: Twilio call result is not read.** The app cannot tell "rang" from "accepted by Twilio".
 5. **Medium: no snooze, no completed history, no appointment or lab follow-up reminder types.**
 6. **Low: the scheduler depends on GitHub Actions timing,** which can lag by several minutes at busy times.
@@ -63,7 +64,8 @@ Twilio's own delivery result (rang, busy, no answer) is not read yet.
 
 - `scheduled-jobs.yml`: every 5 minutes. A failed request makes the run fail (red in GitHub Actions).
 - The dispatch reply includes `created`, `calls`, `call_failures`, `missed`. These are counts only, with no health data.
-- Not yet: an alert when `call_failures` is high, or when events stay `due` too long.
+- `reminders-health.yml` (after #44): every hour, calls `GET /reminders/health`. Fails when `stuck_events` is above 0. GitHub shows a red run, and can email you, depending on your GitHub notification settings.
+- Not yet: an alert when `call_failures` is high.
 
 ## Phone testing
 
@@ -90,6 +92,13 @@ Nothing has been tested on a physical phone. Do not mark any item passed until i
 - [ ] Import the .ics into Apple Calendar, Google Calendar and Outlook. Times match the reminder's time zone.
 - [ ] Alert on a locked phone shows only generic words.
 
+## Automation
+
+- 5-minute reminder scheduler and nightly cleanup: GitHub Actions `scheduled-jobs.yml` (running).
+- Hourly reminder health check: GitHub Actions `reminders-health.yml` (starts after #44 is merged and deployed).
+- Daily agent run: a Claude scheduled task "FollowThrough reminders daily run", 13:55 UTC. It starts a fresh session that reads this file, fixes red PRs or the next safe task, and opens at most one PR. It has no connectors (Gmail, Render), which it does not need.
+- Reminder delivery never depends on Claude: it runs on GitHub Actions and the API.
+
 ## Needs your approval
 
 - Turning on Twilio calls or reminder emails for real users.
@@ -101,4 +110,4 @@ Nothing has been tested on a physical phone. Do not mark any item passed until i
 
 1. Design note and mockup: one reminder list on the website (merge the planner into account reminders), with appointment and lab follow-up types that need a user-confirmed date.
 2. Plan local notifications for iOS and Android (Expo notifications), with the checklists above. Needs approval before adding the library.
-3. Alert when `call_failures` is above zero or events stay `due` over an hour: a small check in `scheduled-jobs.yml` that fails the run and shows counts only.
+3. Alert on repeated Twilio failures (count them in `/reminders/health` without storing health data).

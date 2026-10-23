@@ -384,6 +384,34 @@ def dispatch(db: Session = Depends(get_db)):
     return run_dispatch(db, datetime.now(timezone.utc))
 
 
+STUCK_AFTER = timedelta(hours=2)
+
+
+def reminder_health(db: Session, now: datetime) -> dict:
+    # Counts only, never names or numbers. A reminder still "due" or "calling" two hours
+    # after its time means the 5-minute scheduler is not running or is failing.
+    week_ago = now - timedelta(days=7)
+    open_states = ("due", "calling")
+    stuck = db.scalar(
+        select(func.count(ReminderEvent.id)).where(
+            ReminderEvent.status.in_(open_states),
+            ReminderEvent.due_at <= now - STUCK_AFTER,
+            ReminderEvent.due_at > week_ago,
+        )
+    )
+    missed = db.scalar(
+        select(func.count(ReminderEvent.id)).where(
+            ReminderEvent.status == "missed", ReminderEvent.due_at > now - timedelta(days=1)
+        )
+    )
+    return {"healthy": not stuck, "stuck_events": stuck or 0, "missed_last_24h": missed or 0}
+
+
+@router.get("/health", dependencies=[Depends(require_cron_token)])
+def health(db: Session = Depends(get_db)):
+    return reminder_health(db, datetime.now(timezone.utc))
+
+
 # --- Twilio voice webhooks -----------------------------------------------------
 
 

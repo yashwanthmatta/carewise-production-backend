@@ -1,0 +1,26 @@
+name: Reminders Health
+
+# Hourly check that reminders are being processed. The run fails (and GitHub shows a
+# red run, and can email you) when a reminder is still open two hours after its time,
+# which means the 5-minute scheduler stopped. The reply holds counts only, no health data.
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check reminder health
+        env:
+          TOKEN: ${{ secrets.CAREWISE_REMINDER_CRON_TOKEN }}
+          API: https://carewise-api.onrender.com
+        run: |
+          if [ -z "$TOKEN" ]; then echo "CAREWISE_REMINDER_CRON_TOKEN is not set; skipping."; exit 0; fi
+          body=$(curl --silent --show-error --fail --max-time 120 --retry 2 \
+            -H "X-CareWise-Cron-Token: $TOKEN" "$API/reminders/health")
+          echo "$body"
+          echo "$body" | python3 -c 'import json, sys; data = json.load(sys.stdin); sys.exit(0 if data.get("healthy") else 1)' \
+            || { echo "::error::Reminders are stuck: the 5-minute scheduler may have stopped."; exit 1; }

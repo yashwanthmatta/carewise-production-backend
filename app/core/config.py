@@ -69,6 +69,11 @@ class Settings(BaseSettings):
         default=False,
         validation_alias=AliasChoices("CAREWISE_PATIENT_QA_SAFETY_VERIFIED", "PATIENT_QA_SAFETY_VERIFIED"),
     )
+    # While DocBridge is a synthetic-data evaluation, every patient page says so.
+    docbridge_pilot_only: bool = Field(
+        default=True,
+        validation_alias=AliasChoices("CAREWISE_DOCBRIDGE_PILOT_ONLY", "DOCBRIDGE_PILOT_ONLY"),
+    )
     stripe_secret_key: str = Field(
         default="",
         validation_alias=AliasChoices("CAREWISE_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"),

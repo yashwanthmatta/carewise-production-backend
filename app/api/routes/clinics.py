@@ -138,6 +138,8 @@ def clinic_out(clinic: Clinic, member: ClinicMember) -> dict:
         "clinician_name": member.display_name,
         "member_role": member.role,
         "patient_qa_enabled": bool(clinic.patient_qa_enabled),
+        # Patient follow-up questions stay locked until their safety check is signed off.
+        "patient_qa_available": bool(settings.patient_qa_safety_verified),
     }
 
 
@@ -686,6 +688,7 @@ def view_packet(payload: PacketViewIn, request: Request, db: Session = Depends(g
         "summary": data["summary"],
         "questions": data["questions"],
         "questions_enabled": bool(clinic and clinic.patient_qa_enabled and settings.patient_qa_safety_verified),
+        "pilot_demo": bool(settings.docbridge_pilot_only),
     }
 
 

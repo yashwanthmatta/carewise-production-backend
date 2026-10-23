@@ -106,6 +106,9 @@ class Settings(BaseSettings):
     twilio_account_sid: str = ""
     twilio_auth_token: str = ""
     twilio_from_number: str = ""
+    # A number people can call back, said at the end of the consent and reminder calls
+    # (FCC rule for prerecorded calls, 47 CFR 64.1200(b)(2)). Empty: no callback line.
+    reminder_callback_number: str = ""
     public_api_url: str = "https://carewise-api.onrender.com"
     reminder_cron_token: str = ""
     # DocBridge email intake. Clinics forward lab PDFs to labs+CODE@<inbound_email_domain>;

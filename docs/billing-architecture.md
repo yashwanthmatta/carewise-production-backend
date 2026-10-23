@@ -46,9 +46,9 @@ paid plan. Each of those needs the owner's approval.
 - **Idempotent events.** `billing_events` stores (provider, event id) with a unique constraint. A repeat,
   or two deliveries racing each other, is acknowledged without changing anything.
 - **One paid plan per account.** Checkout returns 409 if a paid plan is current. Upgrades and downgrades
-  go through Stripe's billing page once it is configured to allow plan switching. Until then the
-  website shows a generic "Checkout could not open" message for a second plan. Showing the 409 message
-  is part of PR 1 below.
+  go through Stripe's billing page once it is configured to allow plan switching. When someone tries a
+  second plan, the website now says where the existing plan can be managed: "Manage plan" for
+  Stripe, iPhone Settings for the App Store, or the Play Store app for Google Play.
 - **Secrets stay server-side.** Stripe keys (and later Apple/Google keys) live only in Render
   environment variables.
 
@@ -72,6 +72,26 @@ paid plan. Each of those needs the owner's approval.
    and BAAs where real patient data is involved.
 6. **Sandbox tests:** Stripe test mode (`stripe trigger`), StoreKit testing in Xcode and TestFlight, Play
    license testers. These need the owner's accounts.
+
+## 3a. Lifecycle tests before any real payment (sandbox only)
+
+Each row needs a pass in test mode before billing goes live. ✅ means an automated test covers the
+server side today; ⬜ needs provider sandboxes and the owner's accounts.
+
+| # | Scenario | Expected | Status |
+|---|---|---|---|
+| 1 | Website purchase (Stripe) | Plan active on the website, iPhone and Android after sign-in | ✅ server (`test_paid_plan_unlocks…`); ⬜ Stripe test mode end to end |
+| 2 | Stripe re-sends an event | Applied once | ✅ `test_a_retried_stripe_event_is_applied_once` |
+| 3 | Payment fails, then succeeds | past_due (still has the plan, grace period), then active | ✅ |
+| 4 | Cancel (Stripe) | Plan ends when Stripe reports `canceled` or deletes it; late invoice events don't bring it back | ✅ |
+| 5 | Second purchase while a plan is current, from **any** provider | 409; website says where to manage the existing plan (Stripe / App Store / Google Play) | ✅ server; ✅ website (browser test for all three sources) |
+| 6 | Apple purchase, then open the website | Website shows the plan with source App Store and no Stripe checkout | ⬜ needs StoreKit integration |
+| 7 | Stripe plan, then try to buy on Android | The app must check `/subscriptions/entitlements` before showing a purchase, so the person isn't charged twice | ⬜ needs Play Billing integration (requirement for that PR) |
+| 8 | Store plan expires or is not renewed | Ends at `expires_at` | ✅ `test_store_subscriptions_end_on_their_expiry_date` |
+| 9 | Refund or revocation (Apple `REFUND`/`REVOKE`, Google `SUBSCRIPTION_REVOKED`, Stripe `charge.refunded`) | Plan ends right away | ⬜ handlers to add with each store integration; Stripe refunds currently rely on the subscription being cancelled |
+| 10 | Account switching on a phone (log out, log in as someone else) | A store purchase stays with the account it was bought for (`appAccountToken` / `obfuscatedAccountId`), not the device | ⬜ |
+| 11 | Restore purchases on a new phone | Plan comes back for the same account | ⬜ |
+| 12 | Grace period and billing retry (store) | Keeps access during the store's grace period, ends after it | ⬜ |
 
 ## 4. Store policy checklist (check current rules before each release)
 

@@ -27,7 +27,7 @@ issue with a regression test, open a focused PR, and document the findings.
 **Tests:** backend `pytest`: 121 passed. `ruff check .`: clean. Frontend evals: 16/16, 34/34, and
 200/200 at 100%.
 
-**PR:** see the PR from `claude/agent-reviewer` into `main` (link in the PR list).
+**PR:** https://github.com/yashwanthmatta/carewise-production-backend/pull/46
 
 **Approvals needed:** the clinical reviewer for R3-01 to R3-04, the owner for the frontend and
 mobile changes, and the security/legal items from the 2026-10-22 assessment.

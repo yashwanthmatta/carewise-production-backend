@@ -217,7 +217,26 @@ class Subscription(Base):
     payment_provider: Mapped[str] = mapped_column(String(80), default="manual")
     provider_reference: Mapped[str] = mapped_column(String(160), default="")
     provider_customer: Mapped[str] = mapped_column(String(160), default="")
+    # Store subscriptions (Apple, Google) end on a known date; Stripe ones end by webhook.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class BillingEvent(Base):
+    """Payment-provider events already applied, so a retried webhook changes nothing twice.
+
+    Holds only provider ids and event types: no card or health data.
+    """
+
+    __tablename__ = "billing_events"
+    __table_args__ = (UniqueConstraint("provider", "event_id", name="uq_billing_events_provider_event"),)
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("bevt"))
+    provider: Mapped[str] = mapped_column(String(40))
+    event_id: Mapped[str] = mapped_column(String(160))
+    event_type: Mapped[str] = mapped_column(String(120), default="")
+    subscription_id: Mapped[str] = mapped_column(String(80), default="")
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class NotificationPreference(Base):

@@ -74,6 +74,12 @@ class Settings(BaseSettings):
         default=True,
         validation_alias=AliasChoices("CAREWISE_DOCBRIDGE_PILOT_ONLY", "DOCBRIDGE_PILOT_ONLY"),
     )
+    # Paid-feature locks stay off until the owner decides what each plan includes;
+    # until then every account gets every feature.
+    entitlement_enforcement: bool = Field(
+        default=False,
+        validation_alias=AliasChoices("CAREWISE_ENTITLEMENT_ENFORCEMENT", "ENTITLEMENT_ENFORCEMENT"),
+    )
     stripe_secret_key: str = Field(
         default="",
         validation_alias=AliasChoices("CAREWISE_STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY"),

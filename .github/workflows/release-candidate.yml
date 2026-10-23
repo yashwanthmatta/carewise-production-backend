@@ -28,7 +28,7 @@ jobs:
       RULES: ${{ inputs.rules_version }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

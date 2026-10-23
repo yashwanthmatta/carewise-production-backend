@@ -79,3 +79,43 @@ issue with a regression test, open a focused PR, and document the findings.
 
 **Approvals needed:** the clinical reviewer for R3-01 to R3-04, the owner for the frontend and
 mobile changes, and the security/legal items from the 2026-10-22 assessment.
+
+## Reviewer agent (independent re-check)
+
+**Assigned task:** Re-check earlier review findings and fixes across the backend, website and app.
+Reproduce defects with synthetic data, fix the verified ones, add tests, open PRs and keep a
+re-check register. Register: `docs/code-review-recheck.md`.
+
+**Status: PARTIALLY COMPLETE** (2026-10-23)
+
+### Requirements and state
+
+| Requirement | State | Evidence |
+|---|---|---|
+| Read earlier reviews, security assessment, release records | Done | Register, "Register" table (R-, S- rows) |
+| Re-check earlier fixes (patient codes, Q&A, headings, vitamin D) | Done | R-01 to R-05 verified; R-02 contained (locked) |
+| Adversarial synthetic reports | Done | 34 reports on both engines; findings N-01 to N-07 |
+| Fix verified defects with tests | Done for N-01 to N-03, round 3 R3-01 and R3-03, and R-06 (vitamin D3) | website PR #114, app PR #46; new CI check `repeat-and-misread-values.mjs` (16 cases); app report cases 38 |
+| No change to existing results | Verified | 0 of 160 review cases and 68 accuracy reports change; 10,000 random reports pass |
+| Website and app parity | Verified | Identical output on 197 reports |
+| DocBridge authorization | Verified | 15 tests plus a direct front-desk probe |
+| Production check | Partly | Render API: live deploys match `main`; database still `0.0.0.0/0`; API on free plan. Direct HTTP blocked by the sandbox network policy |
+| Mobile readiness | Source checks only | typecheck, ci:check, 35 report cases; no device evidence |
+| N-04 to N-07, R3-04, R3-06 | Not fixed | Need a clinical, product or owner decision (register) |
+| Round 3 PR #46 (pause switch R3-05) | Re-verified | `tests/api/test_explanations_pause.py` passes after merging `main` into the branch |
+
+### Changed files
+
+- Website #114: `script.js`, `scripts/eval/repeat-and-misread-values.mjs`, `.github/workflows/frontend-ci.yml`,
+  `docs/releases/rules-2026-10-20.6.md`, `docs/clinical-rules-for-review.md`, `docs/PROJECT-STATUS.md`, cache version files
+- App #46: `src/labPanel.ts`, `src/reportAnalysis.ts`, `scripts/report_cases_check.js`
+- Backend (added to round-3 PR #46, which already holds the pause-switch fix): `docs/code-review-recheck.md`, `docs/agent-task-completion.md`
+
+### Blockers and approvals needed
+
+1. **Owner approval to merge website #114 and app #46** (rules .6). Merging the website deploys it to production.
+   Clinician review of .2 to .6 is still needed before any version counts as validated.
+2. Owner: remove `0.0.0.0/0` from `carewise-postgres` networking (S-02).
+3. Owner: decide whether to pay for a non-free API plan (P-03).
+4. Clinician: decisions on N-04 (comparator values), N-06 (negation after the symptom) and R3-04 (lab flag with no value).
+5. A person with a phone: device, VoiceOver and TalkBack tests.

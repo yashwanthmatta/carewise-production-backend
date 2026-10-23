@@ -264,6 +264,15 @@ class SubscriptionMeOut(BaseModel):
     can_manage_billing: bool
 
 
+class EntitlementsOut(BaseModel):
+    plan_code: str
+    source: str
+    status: str
+    expires_at: datetime | None = None
+    enforced: bool
+    features: list[str]
+
+
 class BillingPortalOut(BaseModel):
     portal_url: str
 

@@ -8,21 +8,24 @@ import urllib.request
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.rbac import Role, require_roles
 from app.core.security import CurrentUser
 from app.db.session import get_db
-from app.models.carewise import Subscription
+from app.models.carewise import BillingEvent, Subscription
 from app.schemas.carewise import (
     BillingPortalOut,
+    EntitlementsOut,
     SubscriptionCheckoutIn,
     SubscriptionCheckoutOut,
     SubscriptionMeOut,
     SubscriptionPlanOut,
 )
 from app.services.audit import write_audit
+from app.services.entitlements import PLAN_RANK, best_subscription, entitlements_for
 
 router = APIRouter()
 
@@ -61,16 +64,17 @@ def list_subscription_plans():
     return [SubscriptionPlanOut(**plan) for plan in SUBSCRIPTION_PLANS.values()]
 
 
-# Paid statuses that still count as the person's current plan.
-CURRENT_STATUSES = ("active", "past_due")
-
-
 def current_subscription(db: Session, user_id: str) -> Subscription | None:
-    return db.scalar(
-        select(Subscription)
-        .where(Subscription.user_id == user_id, Subscription.status.in_(CURRENT_STATUSES))
-        .order_by(Subscription.created_at.desc())
-    )
+    return best_subscription(db, user_id)
+
+
+@router.get("/entitlements", response_model=EntitlementsOut)
+def my_entitlements(
+    user: CurrentUser = Depends(require_roles(Role.PATIENT, Role.ADMIN)),
+    db: Session = Depends(get_db),
+):
+    """What this account can use on every device, whichever store the plan came from."""
+    return EntitlementsOut(**entitlements_for(db, user.user_id))
 
 
 @router.get("/me", response_model=SubscriptionMeOut)
@@ -114,6 +118,14 @@ def create_checkout(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Unknown subscription plan.")
     if not plan["monthly_price_usd"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The Free plan needs no payment.")
+    existing = current_subscription(db, user.user_id)
+    if existing is not None and PLAN_RANK.get(existing.plan_code, 0) > 0:
+        # One paid plan per account; changes go through Manage plan so nobody pays twice.
+        name = SUBSCRIPTION_PLANS.get(existing.plan_code, {}).get("name", "a paid plan")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"You already have {name}. Use Manage plan to change or cancel it.",
+        )
     subscription = Subscription(
         user_id=user.user_id,
         plan_code=payload.plan_code,
@@ -162,15 +174,27 @@ async def stripe_webhook(
     if not isinstance(event_object, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook payload.")
 
+    # Stripe retries deliveries; apply each event once.
+    event_id = event.get("id")
+    if isinstance(event_id, str) and event_id:
+        if db.scalar(select(BillingEvent).where(BillingEvent.provider == "stripe", BillingEvent.event_id == event_id)):
+            return {"received": True, "updated": False, "duplicate": True}
+
     subscription = subscription_for_stripe_object(db, event_object)
+    if isinstance(event_id, str) and event_id:
+        db.add(BillingEvent(provider="stripe", event_id=event_id, event_type=event_type, subscription_id=subscription.id if subscription else ""))
     if subscription is None:
+        commit_billing_event(db)
         return {"received": True, "updated": False}
 
     new_status = subscription_status_for_event(event_type, event_object)
-    if new_status:
+    if new_status and not (subscription.status == "cancelled" and event_type.startswith("invoice.")):
+        # A late invoice event never brings back a cancelled plan.
         subscription.status = new_status
+        # A verified Stripe event means Stripe is where this plan is billed.
+        subscription.payment_provider = "stripe"
 
-    provider_subscription_id = event_object.get("subscription") or event_object.get("id")
+    provider_subscription_id = stripe_subscription_ref(event_object) or event_object.get("id")
     if isinstance(provider_subscription_id, str) and provider_subscription_id.startswith("sub_"):
         subscription.provider_reference = provider_subscription_id
     customer_id = event_object.get("customer")
@@ -186,8 +210,19 @@ async def stripe_webhook(
         subscription.id,
         {"provider": "stripe", "event_type": event_type, "status": subscription.status},
     )
-    db.commit()
+    if not commit_billing_event(db):
+        return {"received": True, "updated": False, "duplicate": True}
     return {"received": True, "updated": True, "status": subscription.status}
+
+
+def commit_billing_event(db: Session) -> bool:
+    """Commit, treating a concurrent delivery of the same event as already applied."""
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        return False
+    return True
 
 
 def stripe_enabled() -> bool:
@@ -293,6 +328,16 @@ def verify_stripe_signature(body: bytes, signature_header: str, webhook_secret: 
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Stripe signature.")
 
 
+def stripe_subscription_ref(event_object: dict) -> str:
+    """The Stripe subscription id on an event object (newer API versions nest it on invoices)."""
+    ref = event_object.get("subscription")
+    if isinstance(ref, str) and ref:
+        return ref
+    details = (event_object.get("parent") or {}).get("subscription_details") or {}
+    ref = details.get("subscription") if isinstance(details, dict) else ""
+    return ref if isinstance(ref, str) else ""
+
+
 def subscription_for_stripe_object(db: Session, event_object: dict) -> Subscription | None:
     subscription_id = event_object.get("client_reference_id") or event_object.get("metadata", {}).get("subscription_id")
     if isinstance(subscription_id, str) and subscription_id.startswith("sub_"):
@@ -300,10 +345,22 @@ def subscription_for_stripe_object(db: Session, event_object: dict) -> Subscript
         if subscription is not None:
             return subscription
 
-    provider_reference = event_object.get("subscription") or event_object.get("id")
+    provider_reference = stripe_subscription_ref(event_object) or event_object.get("id")
     if isinstance(provider_reference, str) and provider_reference:
         return db.scalar(select(Subscription).where(Subscription.provider_reference == provider_reference))
     return None
+
+
+# Stripe subscription statuses mapped onto ours (customer.subscription.updated).
+STRIPE_SUBSCRIPTION_STATUSES = {
+    "active": "active",
+    "trialing": "active",
+    "past_due": "past_due",
+    "unpaid": "past_due",
+    "canceled": "cancelled",
+    "incomplete_expired": "cancelled",
+    "paused": "cancelled",
+}
 
 
 def subscription_status_for_event(event_type: str, event_object: dict) -> str:
@@ -312,6 +369,11 @@ def subscription_status_for_event(event_type: str, event_object: dict) -> str:
         return "active" if payment_status in {"paid", "no_payment_required"} else "pending"
     if event_type == "invoice.payment_failed":
         return "past_due"
+    if event_type in {"invoice.paid", "invoice.payment_succeeded"}:
+        # Renewal, or a failed payment that was later paid.
+        return "active"
+    if event_type == "customer.subscription.updated":
+        return STRIPE_SUBSCRIPTION_STATUSES.get(event_object.get("status", ""), "")
     if event_type == "customer.subscription.deleted":
         return "cancelled"
     return ""

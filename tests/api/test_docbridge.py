@@ -284,3 +284,72 @@ def test_clinician_can_revoke_or_replace_a_patient_link():
         assert client.post("/clinics/packets/qa", json={"token": second, "question": "What was my LDL?"}).status_code == 404
         actions = [e["action"] for e in client.get(f"/clinics/{clinic_id}/packets/{pid}/audit", headers=owner).json()]
         assert "New patient link created (old link turned off)" in actions and "Patient link turned off" in actions
+
+
+def test_patient_questions_stay_locked_until_the_safety_check(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "patient_qa_safety_verified", False)
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        assert client.get("/clinics/me", headers=owner).json()["patient_qa_available"] is False
+        body = {"name": "Maple", "tone": "friendly", "retention_days": 90, "patient_qa_enabled": True}
+        assert client.put(f"/clinics/{clinic_id}/settings", json=body, headers=owner).status_code == 409
+        packet = draft(client, owner, clinic_id)
+        token = client.post(
+            f"/clinics/{clinic_id}/packets/{packet['id']}/approve",
+            json={"summary": "Your LDL cholesterol is above the usual target.", "questions": []},
+            headers=owner,
+        ).json()["patient_token"]
+        assert client.post("/clinics/packets/view", json={"token": token}).json()["questions_enabled"] is False
+        assert client.post("/clinics/packets/qa", json={"token": token, "question": "What was my LDL?"}).status_code == 403
+
+
+def test_patient_link_stops_working_when_it_expires():
+    from datetime import datetime, timedelta, timezone
+
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        packet = draft(client, owner, clinic_id)
+        token = client.post(
+            f"/clinics/{clinic_id}/packets/{packet['id']}/approve",
+            json={"summary": "Your LDL cholesterol is above the usual target.", "questions": []},
+            headers=owner,
+        ).json()["patient_token"]
+        view = client.post("/clinics/packets/view", json={"token": token})
+        assert view.status_code == 200 and view.json()["pilot_demo"] is True
+        with SessionLocal() as db:
+            stored = db.get(LabPacket, packet["id"])
+            stored.expires_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+            db.commit()
+        assert client.post("/clinics/packets/view", json={"token": token}).status_code == 404
+        assert client.post("/clinics/packets/view", json={"token": "not-a-real-token-" + "x" * 30}).status_code == 404
+
+
+def test_approved_content_is_locked_and_front_desk_cannot_decide():
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        invite = client.post(f"/clinics/{clinic_id}/invites", json={"role": "front_desk"}, headers=owner).json()
+        desk, _ = auth_headers(client)
+        client.post("/clinics/join", json={"code": invite["code"], "display_name": "Sam"}, headers=desk)
+        waiting = draft(client, desk, clinic_id, ref="JD-2001")
+        assert client.post(f"/clinics/{clinic_id}/packets/{waiting['id']}/reject", headers=desk).status_code == 403
+
+        packet = draft(client, owner, clinic_id)
+        pid = packet["id"]
+        approve = {"summary": "Your LDL cholesterol is above the usual target.", "questions": []}
+        assert client.post(f"/clinics/{clinic_id}/packets/{pid}/approve", json=approve, headers=owner).status_code == 200
+        changed = {"summary": "Changed after approval.", "questions": []}
+        for headers in (owner, desk):
+            assert client.put(f"/clinics/{clinic_id}/packets/{pid}", json=changed, headers=headers).status_code == 409
+        assert client.post(f"/clinics/{clinic_id}/packets/{pid}/approve", json=changed, headers=owner).status_code == 409
+        assert client.post(f"/clinics/{clinic_id}/packets/{pid}/reject", headers=owner).status_code == 409
+
+
+def test_anonymous_visitors_cannot_reach_clinic_data():
+    with TestClient(create_app()) as client:
+        owner, clinic_id = make_clinic(client)
+        draft(client, owner, clinic_id)
+        for method, path in (("get", "/clinics/me"), ("get", f"/clinics/{clinic_id}/packets"), ("get", f"/clinics/{clinic_id}/members"),
+                             ("get", f"/clinics/{clinic_id}/audit.csv"), ("get", f"/clinics/{clinic_id}/training-pairs.jsonl")):
+            assert getattr(client, method)(path).status_code == 401

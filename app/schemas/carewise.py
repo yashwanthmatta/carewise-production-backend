@@ -399,6 +399,7 @@ class ClinicOut(BaseModel):
     member_role: str
     intake_address: str = ""
     patient_qa_enabled: bool = False
+    patient_qa_available: bool = False
 
 
 class LabMarker(BaseModel):

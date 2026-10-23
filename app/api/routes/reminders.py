@@ -270,7 +270,9 @@ def resend_consent_call(
 # --- Scheduler -------------------------------------------------------------------
 
 
-def call_for(event: ReminderEvent, reminder: MedicineReminder) -> None:
+def call_for(event: ReminderEvent, reminder: MedicineReminder) -> bool:
+    # Returns False when Twilio refused the call. "attempts" counts tries, not calls that
+    # rang, so the family email says "we tried to call" rather than "we called".
     event.attempts = (event.attempts or 0) + 1
     event.last_call_at = datetime.now(timezone.utc)
     event.status = "calling"
@@ -281,6 +283,8 @@ def call_for(event: ReminderEvent, reminder: MedicineReminder) -> None:
         )
     except Exception:  # noqa: BLE001 - a failed call is retried, then counted as missed
         log.exception("Reminder call failed for %s", event.id)
+        return False
+    return True
 
 
 def friendly_clock(moment: datetime) -> str:
@@ -294,7 +298,7 @@ def why_not_confirmed(event: ReminderEvent, reminder: MedicineReminder, person: 
     attempts = event.attempts or 0
     if attempts:
         times = "once" if attempts == 1 else "twice" if attempts == 2 else f"{attempts} times"
-        return f"We called {person} {times} and nobody pressed 1 to say it was taken."
+        return f"We tried to call {person} {times} and nobody pressed 1 to say it was taken."
     if reminder.call_status == "pending_consent":
         return (
             f"No reminder call was made, because {person} has not yet pressed 1 on the first call to agree to calls. "
@@ -333,7 +337,7 @@ def alert_missed(db: Session, event: ReminderEvent, reminder: MedicineReminder) 
 
 
 def run_dispatch(db: Session, now: datetime) -> dict:
-    counts = {"created": 0, "calls": 0, "missed": 0}
+    counts = {"created": 0, "calls": 0, "call_failures": 0, "missed": 0}
     calls_on = settings.reminder_calls_enabled
     for reminder in db.scalars(select(MedicineReminder).where(MedicineReminder.active == 1)).all():
         local_now = now.astimezone(zone(reminder.timezone))
@@ -357,11 +361,11 @@ def run_dispatch(db: Session, now: datetime) -> dict:
         )
         last_call = as_utc(event.last_call_at) if event.last_call_at else None
         if calling and event.attempts == 0:
-            call_for(event, reminder)
             counts["calls"] += 1
+            counts["call_failures"] += not call_for(event, reminder)
         elif calling and event.attempts == 1 and last_call and last_call <= now - RETRY_AFTER:
-            call_for(event, reminder)
             counts["calls"] += 1
+            counts["call_failures"] += not call_for(event, reminder)
         elif calling and event.attempts >= 2 and last_call and last_call <= now - GIVE_UP_AFTER:
             event.status = "missed"
             counts["missed"] += 1
@@ -378,6 +382,34 @@ def run_dispatch(db: Session, now: datetime) -> dict:
 @router.post("/dispatch", dependencies=[Depends(require_cron_token)])
 def dispatch(db: Session = Depends(get_db)):
     return run_dispatch(db, datetime.now(timezone.utc))
+
+
+STUCK_AFTER = timedelta(hours=2)
+
+
+def reminder_health(db: Session, now: datetime) -> dict:
+    # Counts only, never names or numbers. A reminder still "due" or "calling" two hours
+    # after its time means the 5-minute scheduler is not running or is failing.
+    week_ago = now - timedelta(days=7)
+    open_states = ("due", "calling")
+    stuck = db.scalar(
+        select(func.count(ReminderEvent.id)).where(
+            ReminderEvent.status.in_(open_states),
+            ReminderEvent.due_at <= now - STUCK_AFTER,
+            ReminderEvent.due_at > week_ago,
+        )
+    )
+    missed = db.scalar(
+        select(func.count(ReminderEvent.id)).where(
+            ReminderEvent.status == "missed", ReminderEvent.due_at > now - timedelta(days=1)
+        )
+    )
+    return {"healthy": not stuck, "stuck_events": stuck or 0, "missed_last_24h": missed or 0}
+
+
+@router.get("/health", dependencies=[Depends(require_cron_token)])
+def health(db: Session = Depends(get_db)):
+    return reminder_health(db, datetime.now(timezone.utc))
 
 
 # --- Twilio voice webhooks -----------------------------------------------------

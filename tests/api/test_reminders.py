@@ -128,7 +128,7 @@ def test_consent_call_then_reminder_call_then_missed_email(calls):
         assert event.status == "missed" and event.alerted_at is not None
     assert len(emails) == 1 and "Mom" in emails[0]["Subject"]
     body = emails[0].get_content()
-    assert "medical alert" in body and "We called Mom twice" in body
+    assert "medical alert" in body and "We tried to call Mom twice" in body
     assert "Morning pills" not in body and "Morning pills" not in emails[0]["Subject"]
 
     with TestClient(create_app()) as client:
@@ -160,7 +160,7 @@ def test_app_only_reminder_is_marked_missed_after_an_hour(calls):
         assert reminder_routes.run_dispatch(db, now + timedelta(minutes=61))["missed"] == 1
     assert placed == [] and len(emails) == 1
     body = emails[0].get_content()
-    assert "Nobody marked it as taken" in body and "We called" not in body
+    assert "Nobody marked it as taken" in body and "tried to call" not in body
     assert "tap Taken" in body and body.rstrip().endswith("FollowThrough Health")
 
 
@@ -184,7 +184,7 @@ def test_missed_email_explains_calls_waiting_for_agreement(calls):
         dose = db.scalars(select(ReminderEvent).where(ReminderEvent.kind == "dose")).one()
         assert dose.attempts == 0  # only the "press 1 to agree" call went out
     body = emails[0].get_content()
-    assert "has not yet pressed 1" in body and "We called" not in body
+    assert "has not yet pressed 1" in body and "tried to call" not in body
 
 
 def test_friendly_clock():
@@ -229,3 +229,74 @@ def test_other_people_cannot_see_or_change_my_reminders():
         # Still there and unchanged for the owner.
         mine = client.get("/reminders", headers=owner).json()
         assert [item["label"] for item in mine] == ["Morning pills"]
+
+
+def test_failed_twilio_call_is_counted_as_a_failure_not_a_call(calls, monkeypatch):
+    placed, emails = calls
+
+    def refuse(to, url):
+        raise OSError("provider unavailable")
+
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        client.post(
+            "/reminders",
+            json=reminder_body(
+                times=[(now - timedelta(minutes=1)).strftime("%H:%M")], call=True, phone="+15551234567",
+                consent_confirmed=True,
+            ),
+            headers=headers,
+        )
+    monkeypatch.setattr(reminder_routes.reminder_calls, "place_call", refuse)
+    with SessionLocal() as db:
+        counts = reminder_routes.run_dispatch(db, now)
+    assert counts["calls"] == 1 and counts["call_failures"] == 1
+
+
+def dose_events_for(db, reminder_id):
+    return db.scalars(
+        select(ReminderEvent).where(ReminderEvent.reminder_id == reminder_id, ReminderEvent.kind == "dose")
+    ).all()
+
+
+@pytest.mark.parametrize(
+    ("clock", "start", "local_expected"),
+    [
+        # Clocks go back at 2:00 on 1 Nov 2026 in New York, so 1:30 happens twice: remind once.
+        ("01:30", datetime(2026, 11, 1, 4, 0, tzinfo=timezone.utc), "01:30"),
+        # Clocks jump from 2:00 to 3:00 on 8 Mar 2026, so 2:30 never happens: remind once, at 3:30.
+        ("02:30", datetime(2026, 3, 8, 5, 0, tzinfo=timezone.utc), "03:30"),
+    ],
+)
+def test_daylight_saving_days_give_exactly_one_reminder(calls, clock, start, local_expected):
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        created = client.post(
+            "/reminders", json=reminder_body(times=[clock], timezone="America/New_York"), headers=headers
+        ).json()
+    with SessionLocal() as db:
+        # Run the 5-minute scheduler through the whole night.
+        for step in range(0, 6 * 12):
+            reminder_routes.run_dispatch(db, start + timedelta(minutes=5 * step))
+        events = dose_events_for(db, created["id"])
+        assert len(events) == 1
+        local = reminder_routes.as_utc(events[0].due_at).astimezone(reminder_routes.zone("America/New_York"))
+        assert local.strftime("%H:%M") == local_expected
+
+
+def test_reminder_follows_its_own_time_zone_not_the_server(calls):
+    # 08:00 in Tokyo is 23:00 UTC the day before; the scheduler runs in UTC.
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        created = client.post(
+            "/reminders", json=reminder_body(times=["08:00"], timezone="Asia/Tokyo"), headers=headers
+        ).json()
+    with SessionLocal() as db:
+        reminder_routes.run_dispatch(db, datetime(2026, 6, 1, 22, 55, tzinfo=timezone.utc))
+        assert dose_events_for(db, created["id"]) == []
+        reminder_routes.run_dispatch(db, datetime(2026, 6, 1, 23, 0, tzinfo=timezone.utc))
+        reminder_routes.run_dispatch(db, datetime(2026, 6, 1, 23, 5, tzinfo=timezone.utc))
+        events = dose_events_for(db, created["id"])
+        assert len(events) == 1
+        assert reminder_routes.as_utc(events[0].due_at) == datetime(2026, 6, 1, 23, 0, tzinfo=timezone.utc)

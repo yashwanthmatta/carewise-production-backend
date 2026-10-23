@@ -1,6 +1,9 @@
 name: Live Backend Smoke
 
 on:
+  # Nightly synthetic end-to-end check (one example.com test account per run, no real data).
+  schedule:
+    - cron: "53 6 * * *"
   workflow_dispatch:
     inputs:
       base_url:
@@ -22,4 +25,4 @@ jobs:
           python-version: "3.12"
 
       - name: Run live backend smoke test
-        run: python scripts/smoke_test_deploy.py --base-url "${{ inputs.base_url }}"
+        run: python scripts/smoke_test_deploy.py --base-url "${{ inputs.base_url || 'https://carewise-api.onrender.com' }}"

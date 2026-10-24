@@ -258,8 +258,16 @@ def create_stripe_portal_session(customer_id: str) -> str:
     return portal_url
 
 
-def create_stripe_checkout_session(plan: dict, subscription_id: str, customer_email: str) -> dict:
-    data = {
+def renewal_notice(plan: dict) -> str:
+    """Shown beside Stripe's pay button: auto-renewal terms and how to cancel (ROSCA, state ARLs)."""
+    return (
+        f"{plan['name']} renews automatically every month at ${int(plan['monthly_price_usd'])} until you cancel. "
+        "Cancel any time in FollowThrough Health: Profile, then Manage or cancel plan."
+    )
+
+
+def checkout_session_data(plan: dict, subscription_id: str, customer_email: str) -> dict:
+    return {
         "mode": "subscription",
         "customer_email": customer_email,
         "client_reference_id": subscription_id,
@@ -273,7 +281,12 @@ def create_stripe_checkout_session(plan: dict, subscription_id: str, customer_em
         "line_items[0][price_data][product_data][metadata][plan_code]": plan["plan_code"],
         "metadata[subscription_id]": subscription_id,
         "metadata[plan_code]": plan["plan_code"],
+        "custom_text[submit][message]": renewal_notice(plan),
     }
+
+
+def create_stripe_checkout_session(plan: dict, subscription_id: str, customer_email: str) -> dict:
+    data = checkout_session_data(plan, subscription_id, customer_email)
     request = urllib.request.Request(
         "https://api.stripe.com/v1/checkout/sessions",
         data=urllib.parse.urlencode(data).encode("utf-8"),

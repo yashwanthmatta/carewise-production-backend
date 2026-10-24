@@ -24,7 +24,15 @@ def ready(request: Request):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"status": "not_ready", "checks": checks, "issues": readiness_issues(request, checks)},
         )
-    return {"status": "ready", "checks": checks}
+    # Advisories never fail readiness (that would take the API down); the monitor reports them.
+    return {"status": "ready", "checks": checks, "advisories": security_advisories()}
+
+
+def security_advisories() -> list[str]:
+    advisories = []
+    if len(settings.clean_jwt_secret) < 32:
+        advisories.append("CAREWISE_JWT_SECRET is shorter than 32 characters; replace it with a long random value.")
+    return advisories
 
 
 @router.get("/features")

@@ -2,7 +2,7 @@
 
 Read this first at the start of every reminders run. Update it at the end.
 
-Last run: 2026-10-23. Code checked: backend `07f9aa2`, frontend `8d6e756`, mobile `a1a0ce3`.
+Last run: 2026-10-25. Previous: 2026-10-23. Code checked: backend `07f9aa2`, frontend `8d6e756`, mobile `a1a0ce3`.
 Clinical rules seen: candidate `2026-10-20.2`, live rules `2026-10-20.5` (frontend `script.js`).
 Reminder work never touches clinical rules.
 
@@ -64,7 +64,7 @@ Twilio's own delivery result (rang, busy, no answer) is not read yet.
 
 - `scheduled-jobs.yml`: every 5 minutes. A failed request makes the run fail (red in GitHub Actions).
 - The dispatch reply includes `created`, `calls`, `call_failures`, `missed`. These are counts only, with no health data.
-- `reminders-health.yml` (after #44): every hour, calls `GET /reminders/health`. Fails when `stuck_events` is above 0. GitHub shows a red run, and can email you, depending on your GitHub notification settings.
+- `reminders-health.yml` (live since #44 merged; verified 2026-10-24 23:23 UTC, reply `healthy: true, stuck_events: 0`): every hour, calls `GET /reminders/health`. Fails when `stuck_events` is above 0. GitHub shows a red run, and can email you, depending on your GitHub notification settings.
 - Not yet: an alert when `call_failures` is high.
 
 ## Phone testing
@@ -95,8 +95,8 @@ Nothing has been tested on a physical phone. Do not mark any item passed until i
 ## Automation
 
 - 5-minute reminder scheduler and nightly cleanup: GitHub Actions `scheduled-jobs.yml` (running).
-- Hourly reminder health check: GitHub Actions `reminders-health.yml` (starts after #44 is merged and deployed).
-- Daily agent run: a Claude scheduled task "FollowThrough reminders daily run", 13:55 UTC. It starts a fresh session that reads this file, fixes red PRs or the next safe task, and opens at most one PR. It has no connectors (Gmail, Render), which it does not need.
+- Hourly reminder health check: GitHub Actions `reminders-health.yml` (running and reaching the live API).
+- Daily agent run: Claude scheduled task "FollowThrough reminders daily run", 13:55 UTC, into the original reminders session (which has the repos and GitHub access). The first version started empty sessions with no repo and did nothing on 2026-10-24; replaced on 2026-10-25.
 - Reminder delivery never depends on Claude: it runs on GitHub Actions and the API.
 
 ## Needs your approval

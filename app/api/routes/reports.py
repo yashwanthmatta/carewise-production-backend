@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.crypto import decrypt_field, encrypt_field
 from app.core.rbac import Role, require_roles
 from app.core.security import CurrentUser
@@ -182,6 +183,13 @@ def analyze_report(
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found.")
     assert_patient_access(db, user, report.patient_id)
+    # The emergency pause switch stops explanations here too, not only in the apps, so older
+    # app versions and direct API calls can't get one while it is on. The report stays saved.
+    if settings.report_explanations_paused:
+        raise HTTPException(
+            status_code=503,
+            detail="Report explanations are paused while we check a problem. Your report is saved. Please talk to your doctor about your results.",
+        )
 
     report_text = decrypt_field(report.encrypted_report_text)
     if not report_text.strip():

@@ -281,8 +281,9 @@ def call_for(event: ReminderEvent, reminder: MedicineReminder) -> bool:
             decrypt_field(reminder.encrypted_phone),
             reminder_calls.public_url(f"/reminders/voice/{event_token(event.id)}"),
         )
-    except Exception:  # noqa: BLE001 - a failed call is retried, then counted as missed
-        log.exception("Reminder call failed for %s", event.id)
+    except Exception as exc:  # noqa: BLE001 - a failed call is retried, then counted as missed
+        # Only the error type: provider errors can quote the phone number.
+        log.warning("Reminder call failed for %s: %s", event.id, type(exc).__name__)
         return False
     return True
 
@@ -332,8 +333,9 @@ def alert_missed(db: Session, event: ReminderEvent, reminder: MedicineReminder) 
     try:
         send_email(message)
         event.alerted_at = datetime.now(timezone.utc)
-    except Exception:  # noqa: BLE001
-        log.exception("Missed-reminder email failed for %s", event.id)
+    except Exception as exc:  # noqa: BLE001
+        # Only the error type: smtplib errors quote the refused email address.
+        log.warning("Missed-reminder email failed for %s: %s", event.id, type(exc).__name__)
 
 
 def run_dispatch(db: Session, now: datetime) -> dict:

@@ -322,3 +322,27 @@ def test_health_flags_reminders_stuck_when_the_scheduler_stops(calls):
     with TestClient(create_app()) as client:
         body = client.get("/reminders/health", headers={"X-CareWise-Cron-Token": "cron-secret"}).json()
     assert set(body) == {"healthy", "stuck_events", "missed_last_24h"}
+
+
+def test_failed_missed_email_does_not_log_the_family_email_address(calls, monkeypatch, caplog):
+    # smtplib puts refused addresses in the error text; the log must keep only the error type.
+    import smtplib
+
+    placed, _ = calls
+
+    def refuse(message):
+        raise smtplib.SMTPRecipientsRefused({message["To"]: (550, b"mailbox unavailable")})
+
+    monkeypatch.setattr(reminder_routes, "send_email", refuse)
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    with TestClient(create_app()) as client:
+        headers, email = auth_headers(client)
+        client.post(
+            "/reminders", json=reminder_body(times=[(now - timedelta(minutes=1)).strftime("%H:%M")], alert_on_miss=True),
+            headers=headers,
+        )
+    with SessionLocal() as db, caplog.at_level("WARNING"):
+        reminder_routes.run_dispatch(db, now)
+        assert reminder_routes.run_dispatch(db, now + timedelta(minutes=61))["missed"] == 1
+    assert "Missed-reminder email failed" in caplog.text and "SMTPRecipientsRefused" in caplog.text
+    assert email not in caplog.text

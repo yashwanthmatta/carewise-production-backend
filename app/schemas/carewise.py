@@ -486,6 +486,22 @@ class ClinicSettingsIn(BaseModel):
     patient_qa_enabled: bool | None = None
 
 
+VISIT_BLOCKS = ("changes", "flagged", "told", "questions", "agenda", "coverage")
+
+
+class ClinicPriceIn(BaseModel):
+    # CPT codes are 5 characters: four digits plus a digit or letter (for example 80061, 0001U).
+    cpt: str = Field(pattern=r"^\d{4}[0-9A-Z]$")
+    name: str = Field(min_length=1, max_length=80)
+    usd: float = Field(gt=0, le=100000)
+
+
+class ClinicVisitSettingsIn(BaseModel):
+    prices: list[ClinicPriceIn] = Field(default_factory=list, max_length=60)
+    hidden_blocks: list[str] = Field(default_factory=list, max_length=len(VISIT_BLOCKS))
+    coverage_checklist: list[str] = Field(default_factory=list, max_length=10)
+
+
 class ClinicMemberRoleIn(BaseModel):
     role: str = Field(pattern="^(clinician|front_desk)$")
 

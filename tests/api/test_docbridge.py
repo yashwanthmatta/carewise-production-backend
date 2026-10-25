@@ -186,6 +186,8 @@ def test_every_clinic_route_is_closed_to_other_clinics():
             ("delete", f"/clinics/{clinic_id}/members/{member_id}", None),
             ("get", f"/clinics/{clinic_id}/patients/JD-1042/summary", None),
             ("get", f"/clinics/{clinic_id}/metrics", None),
+            ("get", f"/clinics/{clinic_id}/visit-settings", None),
+            ("put", f"/clinics/{clinic_id}/visit-settings", {"prices": [], "hidden_blocks": []}),
             ("post", f"/clinics/{clinic_id}/leave", None),
         ]
         for who in (outsider, stranger):

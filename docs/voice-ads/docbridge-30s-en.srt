@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:04,000
+Lab results often reach patients before anyone explains them.
+
+2
+00:00:04,200 --> 00:00:09,200
+DocBridge drafts a plain-language explanation of each result.
+
+3
+00:00:09,400 --> 00:00:13,900
+A named clinician edits it, and approves it.
+
+4
+00:00:14,100 --> 00:00:18,100
+Then the patient gets a private link.
+
+5
+00:00:18,300 --> 00:00:22,800
+The patient sees it only after it is approved.
+
+6
+00:00:23,000 --> 00:00:27,000
+DocBridge, from FollowThrough Health. Join the pilot waitlist.

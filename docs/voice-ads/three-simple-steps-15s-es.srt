@@ -1,0 +1,15 @@
+1
+00:00:00,000 --> 00:00:03,000
+Uno. Agregue el informe.
+
+2
+00:00:03,200 --> 00:00:06,700
+Dos. Léalo en palabras sencillas.
+
+3
+00:00:06,900 --> 00:00:10,900
+Tres. Lleve sus preguntas al médico.
+
+4
+00:00:11,100 --> 00:00:14,100
+FollowThrough Health.

@@ -16,6 +16,7 @@ Last run: 2026-10-25, backend `main` @ `c3bc075`.
 | CR-008 | backend | `app/services/deidentify.py` `deidentify_text` | Low | PR CREATED | see the PR for branch `claude/agent-reviewer` |
 | CR-004 | backend | `app/api/routes/inbound.py` `process_message` (sender check) | Medium | OPEN | — |
 | CR-009 | backend | `app/api/routes/inbound.py` `process_message` (PDF content) | Low | OPEN | — |
+| CR-013 | frontend + mobile | `script.js` `readLabPanel`/`readLabMeasure`; `src/labPanel.ts`, `src/reportAnalysis.ts` (rules .6 branches) | High | NEEDS HUMAN REVIEW | website #114, app #46 (review comments posted) |
 
 ## CR-008 The training export's de-identification missed opening names and some dates
 
@@ -44,3 +45,15 @@ Last run: 2026-10-25, backend `main` @ `c3bc075`.
 
 - **Problem:** the pilot rule (de-identified labs only) rests on "DEID" in the subject.
 - **Suggested fix:** run the `deidentify.py` patterns on the extracted text and mark the lab "possible identifiers" so the clinician sees a warning. This needs a matching DocBridge screen change in the website.
+
+## CR-013 Rules .6 reads a lab's explanatory sentence as a second result
+
+- **Found:** 2026-10-25, while reviewing website #114 and app #46 (not merged). Live rules `.5` are not affected.
+- **Reproduction (synthetic):**
+  - `"Potassium 4.1 mmol/L 3.5-5.1\nPotassium above 5.5 mmol/L may need follow-up."` gives potassium 5.5 "above" on `.6`, against 4.1 "within" on `.5`.
+  - `"LDL cholesterol 98 mg/dL <100\nLDL cholesterol above 160 mg/dL is considered high."` gives LDL 160 on `.6`, against 98 on `.5`.
+  - The website and the app give the same output.
+- **Patient impact:** a number the lab never measured for this person is shown as their result. It errs toward alarm, but it is still a false value.
+- **Suggested fix:** count a repeat only when the line looks like a result row. Reject lines with words between the test name and the number (above, below, level, is, …), and lines that go on as a sentence after the unit.
+- **Also seen:** `yyyy-mm` and `dd-mm-yyyy` dates are still read as the range, and `Sodium 14O` is still read as 14.
+- **Why human review:** it's a clinically consequential rules change, so the owner and the clinical reviewer decide. This reviewer doesn't push to those branches.

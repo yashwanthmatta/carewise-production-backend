@@ -29,6 +29,7 @@ SCRIPTS = {
         "stopped": "Okay. These reminder calls are now turned off. You will not get any more calls. Goodbye.",
         "no_answer": "We did not hear a button press. Goodbye for now.",
         "unknown": "This reminder is no longer active. Goodbye.",
+        "callback": "To reach FollowThrough Health, call {number}.",
         "family": "your family",
     },
     "es": {
@@ -43,6 +44,7 @@ SCRIPTS = {
         "stopped": "Muy bien. Las llamadas de recordatorio están desactivadas. No recibirá más llamadas. Adiós.",
         "no_answer": "No recibimos ninguna respuesta. Adiós por ahora.",
         "unknown": "Este recordatorio ya no está activo. Adiós.",
+        "callback": "Para comunicarse con FollowThrough Health, llame al {number}.",
         "family": "su familia",
     },
 }
@@ -51,9 +53,29 @@ SCRIPTS = {
 SPEAKING_RATE = "90%"
 
 
+# Calls that ask for consent or remind about a dose end with the callback number, when set.
+CALLBACK_KEYS = ("consent", "dose")
+
+
+def spoken_number(number: str) -> str:
+    """Digits grouped for a listener: '+1 (555) 010-2030' -> '1, 5 5 5, 0 1 0, 2 0 3 0'."""
+    digits = "".join(ch for ch in number if ch.isdigit())
+    if len(digits) == 11 and digits.startswith("1"):
+        groups = [digits[0], digits[1:4], digits[4:7], digits[7:]]
+    elif len(digits) == 10:
+        groups = [digits[0:3], digits[3:6], digits[6:]]
+    else:
+        groups = [digits]
+    return ", ".join(" ".join(group) for group in groups if group)
+
+
 def script(language: str, key: str, caller: str = "") -> str:
     lines = SCRIPTS.get(language, SCRIPTS["en"])
-    return lines[key].format(caller=caller.strip() or lines["family"])
+    text = lines[key].format(caller=caller.strip() or lines["family"])
+    number = spoken_number(settings.clean_env_value(settings.reminder_callback_number))
+    if key in CALLBACK_KEYS and number:
+        text += " " + lines["callback"].format(number=number)
+    return text
 
 
 def say(language: str, text: str) -> str:

@@ -17,6 +17,8 @@ from app.core.security import CurrentUser, get_current_user
 from app.db.session import get_db
 from app.models.carewise import AuditEvent, Clinic, ClinicInvite, ClinicMember, DraftEdit, LabPacket, PatientQuestion
 from app.schemas.carewise import (
+    VISIT_BLOCKS,
+    ClinicVisitSettingsIn,
     ClinicIn,
     ClinicInviteIn,
     ClinicJoinIn,
@@ -372,6 +374,7 @@ ACTION_LABELS = {
     "intake_no_pdf": "Email ignored: no PDF attached",
     "clinic_created": "Clinic created",
     "clinic_settings_changed": "Clinic settings changed",
+    "visit_settings_changed": "Visit summary settings changed",
     "clinic_invite_created": "Invite code created",
     "clinic_joined": "Joined the clinic",
     "clinic_member_role_changed": "Team member role changed",
@@ -557,9 +560,60 @@ def leave_clinic(clinic_id: str, user: CurrentUser = Depends(get_current_user), 
 
 
 # Visit-ready summary: every packet for one patient, with what changed between labs.
+def visit_settings_out(clinic: Clinic) -> dict:
+    try:
+        prices = json.loads(clinic.self_pay_prices or "[]")
+        options = json.loads(clinic.visit_options or "{}")
+    except json.JSONDecodeError:
+        prices, options = [], {}
+    return {
+        "prices": prices,
+        "prices_updated_at": as_utc(clinic.prices_updated_at),
+        "hidden_blocks": [b for b in options.get("hidden_blocks", []) if b in VISIT_BLOCKS],
+        "coverage_checklist": options.get("coverage_checklist", []),
+    }
+
+
+@router.get("/{clinic_id}/visit-settings")
+def get_visit_settings(clinic_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
+    clinic, _ = membership(db, user, clinic_id)
+    return visit_settings_out(clinic)
+
+
+@router.put("/{clinic_id}/visit-settings")
+def update_visit_settings(
+    clinic_id: str, payload: ClinicVisitSettingsIn, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """The clinic's own self-pay prices and what the visit summary shows. Owner only.
+
+    Prices are whatever the clinic enters; FollowThrough Health never supplies or estimates them.
+    """
+    clinic, member = membership(db, user, clinic_id)
+    if member.role != "owner":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the clinic owner can change visit summary settings.")
+    unknown = [b for b in payload.hidden_blocks if b not in VISIT_BLOCKS]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown section: {', '.join(unknown)}.")
+    codes = [p.cpt for p in payload.prices]
+    if len(codes) != len(set(codes)):
+        raise HTTPException(status_code=422, detail="Each CPT code can appear only once in the price list.")
+    checklist = [line.strip() for line in payload.coverage_checklist if line.strip()]
+    if any(len(line) > 200 for line in checklist):
+        raise HTTPException(status_code=422, detail="Keep each checklist line under 200 characters.")
+    prices = [{"cpt": p.cpt, "name": p.name.strip(), "usd": round(p.usd, 2)} for p in payload.prices]
+    if json.loads(clinic.self_pay_prices or "[]") != prices:
+        clinic.self_pay_prices = json.dumps(prices)
+        clinic.prices_updated_at = datetime.now(timezone.utc)
+    clinic.visit_options = json.dumps({"hidden_blocks": sorted(set(payload.hidden_blocks)), "coverage_checklist": checklist})
+    write_audit(db, user.user_id, "", "visit_settings_changed", "clinic", clinic_id,
+                {"prices": len(prices), "hidden": len(set(payload.hidden_blocks)), "checklist": len(checklist)})
+    db.commit()
+    return visit_settings_out(clinic)
+
+
 @router.get("/{clinic_id}/patients/{patient_ref}/summary")
 def visit_summary(clinic_id: str, patient_ref: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
-    membership(db, user, clinic_id)
+    clinic, _ = membership(db, user, clinic_id)
     packets = db.scalars(
         select(LabPacket).where(LabPacket.clinic_id == clinic_id, LabPacket.patient_ref_hash == ref_hash(clinic_id, patient_ref))
     ).all()
@@ -574,7 +628,7 @@ def visit_summary(clinic_id: str, patient_ref: str, user: CurrentUser = Depends(
                 changes.append({"name": marker["name"], "before": old.get("value"), "now": marker.get("value"), "unit": marker.get("unit", ""), "status": marker.get("status", "")})
     write_audit(db, user.user_id, "", "visit_summary_viewed", "clinic", clinic_id, {"packets": len(history)})
     db.commit()
-    return {"patient_ref": patient_ref, "packets": history, "changes": changes}
+    return {"patient_ref": patient_ref, "packets": history, "changes": changes, "settings": visit_settings_out(clinic)}
 
 
 @router.get("/{clinic_id}/metrics")

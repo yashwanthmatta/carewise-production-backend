@@ -341,6 +341,11 @@ class Clinic(Base):
     patient_qa_enabled: Mapped[int] = mapped_column(Integer, default=0)
     # Private part of the clinic's lab intake email address (labs+CODE@...).
     intake_code: Mapped[str | None] = mapped_column(String(24), unique=True, index=True, nullable=True)
+    # Visit summary options set by the owner: the clinic's own self-pay prices (JSON list of
+    # {cpt, name, usd}), sections to hide, and the clinic's coverage checklist.
+    self_pay_prices: Mapped[str] = mapped_column(Text, default="[]")
+    prices_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    visit_options: Mapped[str] = mapped_column(Text, default="{}")
     owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

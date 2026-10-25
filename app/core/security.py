@@ -5,7 +5,7 @@ import secrets
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+import jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
@@ -89,7 +89,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             email=user.email,
             role=role,
         )
-    except JWTError as error:
+    except (jwt.PyJWTError, KeyError) as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired authentication token.",

@@ -321,7 +321,45 @@ def test_health_flags_reminders_stuck_when_the_scheduler_stops(calls):
         assert reminder_routes.reminder_health(db, now + timedelta(hours=3))["stuck_events"] == before["stuck_events"]
     with TestClient(create_app()) as client:
         body = client.get("/reminders/health", headers={"X-CareWise-Cron-Token": "cron-secret"}).json()
-    assert set(body) == {"healthy", "stuck_events", "missed_last_24h"}
+    assert set(body) == {"healthy", "stuck_events", "skipped_times", "missed_last_24h"}
+
+
+def test_health_flags_reminder_times_the_scheduler_never_reached(calls):
+    # GitHub can run the "every 5 minutes" job hours late. A reminder time with no event
+    # means nobody was reminded, and the health check must say so.
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    due = now - timedelta(minutes=1)
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        created = client.post(
+            "/reminders", json=reminder_body(times=[due.strftime("%H:%M")]), headers=headers
+        ).json()
+    with SessionLocal() as db:
+        reminder = db.get(MedicineReminder, created["id"])
+        reminder.created_at = now - timedelta(days=1)
+        db.commit()
+        # An hour later, the scheduler never ran: one skipped time, and unhealthy.
+        later = now + timedelta(hours=1)
+        report = reminder_routes.reminder_health(db, later)
+        assert report["skipped_times"] >= 1 and not report["healthy"]
+        assert dose_events_for(db, created["id"]) == []
+        # Had the scheduler run on time, the event exists and the time is not counted.
+        reminder_routes.run_dispatch(db, now)
+        assert len(dose_events_for(db, created["id"])) == 1
+        assert reminder_routes.skipped_times(db, later) == report["skipped_times"] - 1
+
+
+def test_health_ignores_times_before_the_reminder_existed(calls):
+    now = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    with SessionLocal() as db:
+        before = reminder_routes.skipped_times(db, now)
+    with TestClient(create_app()) as client:
+        headers, _ = auth_headers(client)
+        client.post(
+            "/reminders", json=reminder_body(times=[(now - timedelta(hours=1)).strftime("%H:%M")]), headers=headers
+        )
+    with SessionLocal() as db:
+        assert reminder_routes.skipped_times(db, now) == before
 
 
 def test_failed_missed_email_does_not_log_the_family_email_address(calls, monkeypatch, caplog):

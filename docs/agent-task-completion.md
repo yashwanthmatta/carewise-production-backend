@@ -43,6 +43,8 @@
 
 ### Blockers and approvals needed
 
+- **Approve a dependable reminder scheduler.** GitHub runs the 5-minute job only every 1 to 5 hours, so most reminder times are skipped. The health check now detects this (`skipped_times`).
+
 - Approve a database table for appointment and follow-up reminders.
 - Approve adding phone notifications to the mobile app (new permission; App Store and Play Store disclosures change).
 - Merge frontend #107 (backend #44 is merged and live). #107 was brought up to date with main on 2026-10-25.

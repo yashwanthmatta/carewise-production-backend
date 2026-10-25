@@ -387,11 +387,31 @@ def dispatch(db: Session = Depends(get_db)):
 
 
 STUCK_AFTER = timedelta(hours=2)
+SKIP_LOOKBACK = timedelta(hours=3)
+SKIP_GRACE = timedelta(minutes=30)
+
+
+def skipped_times(db: Session, now: datetime) -> int:
+    # Reminder times in the last few hours that never got an event: the scheduler did not
+    # run within DUE_WINDOW of them, so nobody was reminded. Times before the reminder was
+    # created are not counted. (Editing a reminder's times can rarely add a false count.)
+    start, end = now - SKIP_LOOKBACK, now - SKIP_GRACE
+    skipped = 0
+    for reminder in db.scalars(select(MedicineReminder).where(MedicineReminder.active == 1)).all():
+        created = as_utc(reminder.created_at) if reminder.created_at else start
+        tz = zone(reminder.timezone)
+        local_days = {start.astimezone(tz).date(), end.astimezone(tz).date()}
+        for local_day in local_days:
+            for _clock, due_at in due_moments(reminder, local_day):
+                if max(start, created) < due_at <= end and not find_event(db, reminder.id, "dose", due_at):
+                    skipped += 1
+    return skipped
 
 
 def reminder_health(db: Session, now: datetime) -> dict:
     # Counts only, never names or numbers. A reminder still "due" or "calling" two hours
-    # after its time means the 5-minute scheduler is not running or is failing.
+    # after its time, or a reminder time with no event at all, means the 5-minute
+    # scheduler is not running, is running late, or is failing.
     week_ago = now - timedelta(days=7)
     open_states = ("due", "calling")
     stuck = db.scalar(
@@ -406,7 +426,13 @@ def reminder_health(db: Session, now: datetime) -> dict:
             ReminderEvent.status == "missed", ReminderEvent.due_at > now - timedelta(days=1)
         )
     )
-    return {"healthy": not stuck, "stuck_events": stuck or 0, "missed_last_24h": missed or 0}
+    skipped = skipped_times(db, now)
+    return {
+        "healthy": not stuck and not skipped,
+        "stuck_events": stuck or 0,
+        "skipped_times": skipped,
+        "missed_last_24h": missed or 0,
+    }
 
 
 @router.get("/health", dependencies=[Depends(require_cron_token)])

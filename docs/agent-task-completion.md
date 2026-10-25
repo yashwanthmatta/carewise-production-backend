@@ -140,7 +140,7 @@ scheduled checks, write ad voiceovers, keep a status file.
 | 4 | Tests for decimals, units, ranges, negative numbers and negations, English and Spanish | COMPLETE | 36 exact cases and round-trip checks in frontend and mobile, run in CI |
 | 5 | Mobile read-aloud (iOS and Android) | PARTIALLY COMPLETE | Mobile #48: code and tests done; needs review, merge, an EAS build and real-device testing |
 | 6 | Ad voiceovers for the family campaigns (15 and 30 seconds, English, Spanish draft, subtitles, direction, music, mixing, disclosures) | PARTIALLY COMPLETE | 4 campaigns in `docs/voice-ads/` (Mom's Lab Report, What Does This Mean?, Three Simple Steps, DocBridge), checked by `tests/test_voice_ads.py`. Not recorded, approved or published. 4 more concepts from the brief not drafted |
-| 7 | Scheduled audio quality checks | PARTIALLY COMPLETE | Audio QA workflow (nightly, frontend) is merged; first run started by hand on 2026-10-25. Live-site step waits until the wording is deployed |
+| 7 | Scheduled audio quality checks | COMPLETE | Audio QA workflow (nightly 07:23 UTC, frontend) merged. Run 1 on 2026-10-25 passed on `main` and on the live site: https://github.com/yashwanthmatta/carewise-frontend/actions/runs/40147511673 |
 | 8 | Status file | COMPLETE | `docs/voice-audio-agent-status.md` |
 | 9 | Pause, resume, speed control, read one result | NOT STARTED | Backlog |
 | 10 | Real-device listening tests | BLOCKED | Needs a person with an iPhone and an Android phone |
@@ -183,7 +183,7 @@ scheduled checks, write ad voiceovers, keep a status file.
 - https://github.com/yashwanthmatta/carewise-production-backend/pull/25 (merged)
 - https://github.com/yashwanthmatta/carewise-frontend/pull/109 (merged)
 - https://github.com/yashwanthmatta/carewise-mobile-app/pull/48 (open)
-- Backend PR for this work: see the PR that adds this file.
+- https://github.com/yashwanthmatta/carewise-production-backend/pull/52 (open, this work)
 
 ### Final status
 

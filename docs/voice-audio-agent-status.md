@@ -8,7 +8,7 @@ Only things that were actually built and tested are listed as done.
 | Where | Feature | State |
 |---|---|---|
 | Website | **Listen** button on a report (browser's own voice, 0.9 speed, English or Spanish) | Live before this work. Fixed in frontend PR #109 (merged 2026-10-24) |
-| Website | Lab values said in words with the same meaning (`spokenText` in `script.js`) | Merged (frontend #109) |
+| Website | Lab values said in words with the same meaning (`spokenText` in `script.js`) | Merged (frontend #109) and live; checked on the live site 2026-10-25 |
 | Mobile app | **Listen** button on the report screen (phone's own voice, `expo-speech`) | Pull request open: mobile #48 |
 | Backend | Medicine reminder phone calls (Twilio Polly voices, keypad answers) | Live. Clearer scripts merged in backend #25. Spanish fixes in the backend PR for this work |
 | Ads | Voiceover scripts and subtitles for 4 campaigns | Drafts in `docs/voice-ads/`, not approved, not published |
@@ -68,5 +68,8 @@ The tests are what was run. No real-device listening has been done yet.
 
 ## Last automated run
 
-See the Audio QA workflow runs in carewise-frontend. Do not write results here unless a run
-actually happened.
+- 2026-10-25, Audio QA run 1 (started by hand), on `main` and on the live website
+  https://followthroughhealth.com: **passed**, 36 read-aloud cases and 8 reports each. This shows
+  the read-aloud fix is live. Run: https://github.com/yashwanthmatta/carewise-frontend/actions/runs/40147511673
+
+Add later runs here only when they actually happened.

@@ -56,4 +56,5 @@ Last run: 2026-10-25, backend `main` @ `c3bc075`.
 - **Patient impact:** a number the lab never measured for this person is shown as their result. It errs toward alarm, but it is still a false value.
 - **Suggested fix:** count a repeat only when the line looks like a result row. Reject lines with words between the test name and the number (above, below, level, is, …), and lines that go on as a sentence after the unit.
 - **Also seen:** `yyyy-mm` and `dd-mm-yyyy` dates are still read as the range, and `Sodium 14O` is still read as 14.
+- **Independently confirmed:** another reviewer session recorded the same regression as R6-REG in `docs/code-review-fix-check.md`, with an A1C footnote example.
 - **Why human review:** it's a clinically consequential rules change, so the owner and the clinical reviewer decide. This reviewer doesn't push to those branches.

@@ -25,10 +25,22 @@ MONTHS = r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul
 DATES = [
     re.compile(r"\b((?:19|20)\d{2})-\d{1,2}-\d{1,2}\b"),
     re.compile(r"\b\d{1,2}/\d{1,2}/((?:19|20)\d{2})\b"),
+    re.compile(r"\b((?:19|20)\d{2})/\d{1,2}/\d{1,2}\b"),
     re.compile(rf"\b{MONTHS}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s+((?:19|20)\d{{2}})\b", re.I),
     re.compile(rf"\b\d{{1,2}}(?:st|nd|rd|th)?\s+{MONTHS}\.?,?\s+((?:19|20)\d{{2}})\b", re.I),
 ]
 SHORT_DATE = re.compile(r"\b\d{1,2}/\d{1,2}/\d{2}\b")
+# A day and month with no year ("Oct 3", "3rd October"). "May" must be capitalised so the
+# word "may" before a number is left alone.
+DAY_MONTHS = r"(?:(?i:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|May)"
+MONTH_DAY = [
+    re.compile(rf"\b{DAY_MONTHS}\.?\s+\d{{1,2}}(?:st|nd|rd|th)?\b"),
+    re.compile(rf"\b\d{{1,2}}(?:st|nd|rd|th)?\s+(?:of\s+)?{DAY_MONTHS}\b"),
+]
+# A letter that opens with the person's full name ("Maria Lopez, your A1c ..."). Two
+# capitalised words then a comma and "you"/"your"; common lab words are not names.
+NOT_NAMES = r"(?:Total|Vitamin|Free|Fasting|Blood|Serum|Plasma|Urine|Good|Great|Overall|Dear|Hello|Hi|Hey|Your|Our)"
+OPENING_NAME = re.compile(rf"^(\s*)(?!{NOT_NAMES}\b)[A-Z][a-z'-]+\s+[A-Z][a-z'-]+,(?=\s+(?:your|you)\b)", re.M)
 OLD_AGE = re.compile(r"\b(9\d|1[01]\d)[\s-]*(?:years?|yrs?|y/?o)\b(?:[\s-]*old)?", re.I)
 
 
@@ -43,6 +55,9 @@ def deidentify_text(text: str, known: list[str] | tuple[str, ...] = ()) -> str:
     for pattern in DATES:
         out = pattern.sub(lambda m: m.group(1), out)
     out = SHORT_DATE.sub("[DATE]", out)
+    for pattern in MONTH_DAY:
+        out = pattern.sub("[DATE]", out)
+    out = OPENING_NAME.sub(r"\1[NAME],", out)
     return OLD_AGE.sub("90+ years", out)
 
 

@@ -119,3 +119,24 @@ re-check register. Register: `docs/code-review-recheck.md`.
 3. Owner: decide whether to pay for a non-free API plan (P-03).
 4. Clinician: decisions on N-05 (two date columns), N-06 (negation after the symptom) and R3-04 (lab flag with no value).
 5. A person with a phone: device, VoiceOver and TalkBack tests.
+
+## Code review agent (2026-10-25)
+
+**Assigned task:** independent review of all three repositories; fix the highest-priority safe
+issue with a regression test and open a PR; keep a findings register.
+
+**Final status: PARTIALLY COMPLETE**
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| Fix a verified issue with a test, and open a PR | COMPLETE | CR-008 in `docs/code-review-agent.md`. New test fails before the fix and passes after; backend 142 passed, `ruff` clean |
+| Findings register | COMPLETE | `docs/code-review-agent.md` (only findings not already in `docs/code-review-recheck.md`) |
+| Review the open PRs in the website and app repos | PARTIALLY COMPLETE | See the review comments on each PR; anything not reviewed is listed in the PR body |
+| Production HTTP checks | BLOCKED | This container's network refuses followthroughhealth.com and the API |
+| Native iOS/Android builds and devices | BLOCKED | Needs the owner's Apple and Google accounts and a physical phone |
+
+**Changed files:** `app/services/deidentify.py`, `tests/api/test_draft_edits.py`,
+`docs/code-review-agent.md`, `docs/agent-task-completion.md`.
+
+**Approvals needed:** CR-004 needs the inbound email provider named. Owner items S-02 (database
+network) and P-03 (free plan) are in `docs/code-review-recheck.md`.

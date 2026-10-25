@@ -128,3 +128,23 @@ def test_deidentify_keeps_lab_values_and_drops_identifiers():
         assert gone not in out, gone
     for kept in ("LDL 148 mg/dL (ref <100) H", "4.2 mmol/L 3.5-5.3", "11.6 x10^9/L 4.0-11.0", "Collected 2026", "90+ years"):
         assert kept in out, kept
+
+
+def test_deidentify_catches_opening_names_and_dates_without_a_year():
+    # Found in review: these came through the training export unchanged.
+    text = (
+        "Maria Lopez, your A1c is 7.2 % (ref 4.0-5.6).\n"
+        "Seen on 2026/10/03, results back Oct 3 and repeated on 3rd October."
+    )
+    out = deidentify_text(text, ["REF-1042"])
+    for gone in ("Maria", "Lopez", "10/03", "Oct 3", "3rd October"):
+        assert gone not in out, gone
+    assert out.startswith("[NAME], your A1c is 7.2 % (ref 4.0-5.6).") and "Seen on 2026," in out
+    # Lab names, values and ordinary words stay: they are the signal.
+    for kept in (
+        "Total Cholesterol, your level is 210 mg/dL.",
+        "Vitamin D, your level is 18 ng/mL.",
+        "Your LDL may 2 points rise.",
+        "Your LDL decreased 3 points.",
+    ):
+        assert deidentify_text(kept) == kept, kept

@@ -1,0 +1,23 @@
+1
+00:00:00,000 --> 00:00:04,000
+Los resultados suelen llegar al paciente antes de que alguien los explique.
+
+2
+00:00:04,200 --> 00:00:09,200
+DocBridge prepara un borrador en lenguaje sencillo de cada resultado.
+
+3
+00:00:09,400 --> 00:00:13,900
+Un profesional clínico lo revisa, lo edita y lo aprueba.
+
+4
+00:00:14,100 --> 00:00:18,100
+Después, el paciente recibe un enlace privado.
+
+5
+00:00:18,300 --> 00:00:22,800
+El paciente lo ve solo después de la aprobación.
+
+6
+00:00:23,000 --> 00:00:27,000
+DocBridge, de FollowThrough Health. Únase a la lista del piloto.

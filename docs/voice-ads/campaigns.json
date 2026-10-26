@@ -1,0 +1,450 @@
+{
+  "note": "Source of truth for ad voiceovers. Run `python scripts/build_voice_ads.py` after editing; tests check the generated files match. Every claim must already be on followthroughhealth.com. Spanish is a draft for a qualified language reviewer. Nothing here is approved or published.",
+  "claims_source": "followthroughhealth.com home page and DocBridge page as of 2026-10-23: 'explains every result in plain words', 'shows which ones to ask about first', 'gets you ready for the doctor', 'one-page doctor brief', 'Free, and read on your own device', 'English and Español', DocBridge 'draft, a named clinician edits and approves, then the patient gets a private link', doctor pilot waitlist.",
+  "campaigns": [
+    {
+      "id": "moms-lab-report",
+      "title": "Mom's Lab Report",
+      "audience": "Adult children looking after a parent",
+      "style": "Family: warm, natural, trustworthy",
+      "voice": "Adult narrator, 30s to 50s, warm and unhurried, like a friend who has been through it. No announcer energy. Spanish: neutral Latin American, same warmth.",
+      "visuals": "Actor as adult daughter at a kitchen table at night, phone in hand. Screen recordings of the real app with a synthetic sample report only. No real patient data, no real doctor.",
+      "music": "Soft solo piano or acoustic guitar, slow (about 70 BPM), no lyrics. Starts after the first line, lifts gently on the brand line.",
+      "on_screen": [
+        "Synthetic sample report. Actors portrayed.",
+        "Not medical advice. Always talk to your doctor."
+      ],
+      "versions": {
+        "30": {
+          "en": [
+            [
+              3.0,
+              "Mom's lab report came in at nine at night."
+            ],
+            [
+              3.5,
+              "Pages of numbers. Short forms. Ranges written for doctors."
+            ],
+            [
+              5.0,
+              "FollowThrough Health explains every result in plain words."
+            ],
+            [
+              5.0,
+              "It shows which results to ask about first."
+            ],
+            [
+              5.0,
+              "And it gets you ready for the doctor, with a one-page brief."
+            ],
+            [
+              3.8,
+              "In English or Spanish. Free, and read on your own device."
+            ],
+            [
+              3.3,
+              "FollowThrough Health. Ready for the visit."
+            ]
+          ],
+          "es": [
+            [
+              3.0,
+              "El análisis de mamá llegó ya de noche."
+            ],
+            [
+              3.5,
+              "Páginas de números. Siglas. Rangos escritos para médicos."
+            ],
+            [
+              5.0,
+              "FollowThrough Health explica cada resultado en palabras sencillas."
+            ],
+            [
+              5.0,
+              "Le muestra qué resultados preguntar primero."
+            ],
+            [
+              5.0,
+              "Y le ayuda a prepararse para el médico, con un resumen de una página."
+            ],
+            [
+              3.8,
+              "En español o inglés. Gratis, y en su propio dispositivo."
+            ],
+            [
+              3.3,
+              "FollowThrough Health. Listos para la consulta."
+            ]
+          ]
+        },
+        "15": {
+          "en": [
+            [
+              3.0,
+              "Mom's lab report came in at nine at night."
+            ],
+            [
+              4.5,
+              "FollowThrough Health explains every result in plain words."
+            ],
+            [
+              4.0,
+              "And gets you ready for the doctor."
+            ],
+            [
+              2.9,
+              "FollowThrough Health. Free to start."
+            ]
+          ],
+          "es": [
+            [
+              3.0,
+              "El análisis de mamá llegó ya de noche."
+            ],
+            [
+              4.5,
+              "FollowThrough Health explica cada resultado en palabras sencillas."
+            ],
+            [
+              4.0,
+              "Y le ayuda a prepararse para el médico."
+            ],
+            [
+              2.9,
+              "FollowThrough Health. Empiece gratis."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "what-does-this-mean",
+      "title": "What Does This Mean?",
+      "audience": "Anyone who has opened a lab report and got stuck on the short forms",
+      "style": "Educational: clear, friendly, confident without overstating accuracy",
+      "voice": "Friendly, clear narrator. Slightly brisker than the family ad but every word easy to catch. Spanish: neutral Latin American.",
+      "visuals": "Lab short forms pop on screen one by one from a synthetic report, then the app's plain-word line for each. No values that suggest a disease.",
+      "music": "Light, curious pizzicato or marimba, about 95 BPM, low under the voice.",
+      "on_screen": [
+        "Synthetic sample report.",
+        "Explains reports. Does not diagnose. Talk to your doctor."
+      ],
+      "versions": {
+        "30": {
+          "en": [
+            [
+              3.5,
+              "eGFR. A1C. TSH. What does this mean?"
+            ],
+            [
+              4.5,
+              "Lab reports are written for clinicians. You still have to read them."
+            ],
+            [
+              4.5,
+              "FollowThrough Health explains every result in plain words."
+            ],
+            [
+              4.5,
+              "Each one is checked against the range printed on your own report."
+            ],
+            [
+              4.5,
+              "Then it writes questions to bring to your doctor."
+            ],
+            [
+              4.0,
+              "It explains. It doesn't diagnose. Your doctor does that."
+            ],
+            [
+              3.0,
+              "FollowThrough Health. Free to try."
+            ]
+          ],
+          "es": [
+            [
+              3.5,
+              "TFGe. A1C. TSH. ¿Qué significa esto?"
+            ],
+            [
+              4.5,
+              "Los análisis se escriben para médicos. Pero usted tiene que leerlos."
+            ],
+            [
+              4.5,
+              "FollowThrough Health explica cada resultado en palabras sencillas."
+            ],
+            [
+              4.5,
+              "Cada uno se compara con el rango impreso en su propio informe."
+            ],
+            [
+              4.5,
+              "Y escribe preguntas para llevar a su médico."
+            ],
+            [
+              4.0,
+              "Explica. No diagnostica. Eso lo hace su médico."
+            ],
+            [
+              3.0,
+              "FollowThrough Health. Pruébelo gratis."
+            ]
+          ]
+        },
+        "15": {
+          "en": [
+            [
+              3.5,
+              "eGFR. A1C. TSH. What does this mean?"
+            ],
+            [
+              5.0,
+              "FollowThrough Health explains each one in plain words, next to your lab's own range."
+            ],
+            [
+              3.0,
+              "Then ask your doctor."
+            ],
+            [
+              2.5,
+              "FollowThrough Health."
+            ]
+          ],
+          "es": [
+            [
+              3.5,
+              "TFGe. A1C. TSH. ¿Qué significa esto?"
+            ],
+            [
+              5.0,
+              "FollowThrough Health explica cada uno en palabras sencillas, junto al rango de su laboratorio."
+            ],
+            [
+              3.0,
+              "Luego pregunte a su médico."
+            ],
+            [
+              2.5,
+              "FollowThrough Health."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "three-simple-steps",
+      "title": "Three Simple Steps",
+      "audience": "Families ready to try the app",
+      "style": "Educational: clear, friendly, step by step",
+      "voice": "Calm, friendly guide. Short pause after each number. Spanish: neutral Latin American.",
+      "visuals": "Real app screen recording with a synthetic sample report: choose a report, read the explanations, open the doctor questions and brief.",
+      "music": "Simple upbeat acoustic, about 100 BPM, ducked under each step.",
+      "on_screen": [
+        "Synthetic sample report.",
+        "Not medical advice. Always talk to your doctor."
+      ],
+      "versions": {
+        "30": {
+          "en": [
+            [
+              2.5,
+              "Three simple steps."
+            ],
+            [
+              5.0,
+              "One. Add the report. A PDF, a photo, or type the numbers."
+            ],
+            [
+              5.5,
+              "Two. Read every result in plain words, with the ones to ask about first."
+            ],
+            [
+              5.5,
+              "Three. Take your questions and a one-page brief to the doctor."
+            ],
+            [
+              4.5,
+              "In English or Spanish. Free, and read on your own device."
+            ],
+            [
+              3.0,
+              "FollowThrough Health."
+            ]
+          ],
+          "es": [
+            [
+              2.5,
+              "Tres pasos sencillos."
+            ],
+            [
+              5.0,
+              "Uno. Agregue el informe. Un PDF, una foto, o escriba los números."
+            ],
+            [
+              5.5,
+              "Dos. Lea cada resultado en palabras sencillas, con los que debe preguntar primero."
+            ],
+            [
+              5.5,
+              "Tres. Lleve sus preguntas y un resumen de una página al médico."
+            ],
+            [
+              4.5,
+              "En español o en inglés. Gratis, y se lee en su propio dispositivo."
+            ],
+            [
+              3.0,
+              "FollowThrough Health."
+            ]
+          ]
+        },
+        "15": {
+          "en": [
+            [
+              3.0,
+              "One. Add the report."
+            ],
+            [
+              3.5,
+              "Two. Read it in plain words."
+            ],
+            [
+              4.0,
+              "Three. Take your questions to the doctor."
+            ],
+            [
+              3.0,
+              "FollowThrough Health."
+            ]
+          ],
+          "es": [
+            [
+              3.0,
+              "Uno. Agregue el informe."
+            ],
+            [
+              3.5,
+              "Dos. Léalo en palabras sencillas."
+            ],
+            [
+              4.0,
+              "Tres. Lleve sus preguntas al médico."
+            ],
+            [
+              3.0,
+              "FollowThrough Health."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "docbridge",
+      "title": "DocBridge",
+      "audience": "Clinicians and clinic managers",
+      "style": "DocBridge: professional, calm, credible",
+      "voice": "Calm, professional narrator, measured pace. No hype words. Spanish: neutral Latin American, formal usted.",
+      "visuals": "DocBridge demo mode with the made-up demo clinic and synthetic patient: draft, edit, approve, private link. No real clinician, logo or endorsement.",
+      "music": "Minimal ambient pad, about 80 BPM, very low.",
+      "on_screen": [
+        "Demo with synthetic data. Not a real clinic or patient.",
+        "Clinician-reviewed explanations. DocBridge does not diagnose."
+      ],
+      "versions": {
+        "30": {
+          "en": [
+            [
+              4.0,
+              "Lab results often reach patients before anyone explains them."
+            ],
+            [
+              5.0,
+              "DocBridge drafts a plain-language explanation of each result."
+            ],
+            [
+              4.5,
+              "A named clinician edits it, and approves it."
+            ],
+            [
+              4.0,
+              "Then the patient gets a private link."
+            ],
+            [
+              4.5,
+              "The patient sees it only after it is approved."
+            ],
+            [
+              4.0,
+              "DocBridge, from FollowThrough Health. Join the pilot waitlist."
+            ]
+          ],
+          "es": [
+            [
+              4.0,
+              "Los resultados suelen llegar al paciente antes de que alguien los explique."
+            ],
+            [
+              5.0,
+              "DocBridge prepara un borrador en lenguaje sencillo de cada resultado."
+            ],
+            [
+              4.5,
+              "Un profesional clínico lo revisa, lo edita y lo aprueba."
+            ],
+            [
+              4.0,
+              "Después, el paciente recibe un enlace privado."
+            ],
+            [
+              4.5,
+              "El paciente lo ve solo después de la aprobación."
+            ],
+            [
+              4.0,
+              "DocBridge, de FollowThrough Health. Únase a la lista del piloto."
+            ]
+          ]
+        },
+        "15": {
+          "en": [
+            [
+              4.5,
+              "DocBridge drafts plain-language lab explanations."
+            ],
+            [
+              4.5,
+              "A clinician edits and approves them."
+            ],
+            [
+              3.0,
+              "Then the patient gets a private link."
+            ],
+            [
+              2.4,
+              "Join the pilot waitlist."
+            ]
+          ],
+          "es": [
+            [
+              4.5,
+              "DocBridge prepara explicaciones sencillas de los análisis."
+            ],
+            [
+              4.5,
+              "Un profesional clínico las edita y las aprueba."
+            ],
+            [
+              3.0,
+              "Luego el paciente recibe un enlace privado."
+            ],
+            [
+              2.4,
+              "Únase a la lista del piloto."
+            ]
+          ]
+        }
+      }
+    }
+  ]
+}

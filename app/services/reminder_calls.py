@@ -26,7 +26,7 @@ SCRIPTS = {
         "consent_yes": "Thank you. We will call you at each reminder time. "
         "To stop the calls, press 9 during any call. Goodbye.",
         "taken": "Thank you. We will let {caller} know. Goodbye.",
-        "stopped": "Okay. These reminder calls are now turned off. You will not get any more. Goodbye.",
+        "stopped": "Okay. These reminder calls are now turned off. You will not get any more calls. Goodbye.",
         "no_answer": "We did not hear a button press. Goodbye for now.",
         "unknown": "This reminder is no longer active. Goodbye.",
         "callback": "To reach FollowThrough Health, call {number}.",
@@ -34,15 +34,15 @@ SCRIPTS = {
     },
     "es": {
         "consent": "Hola. Esta es una llamada automática de FollowThrough Health. "
-        "{caller} nos pidió llamarle cuando sea hora de tomar su medicina. ¿Está de acuerdo? "
-        "Para decir que sí, marque 1. Para decir que no, marque 9. Para escuchar de nuevo, marque 2.",
+        "{caller} nos pidió que le llamemos cuando sea hora de tomar su medicina. ¿Está de acuerdo? "
+        "Para decir que sí, marque 1. Para decir que no, marque 9. Para escuchar este mensaje otra vez, marque 2.",
         "dose": "Hola. Le llama FollowThrough Health con un recordatorio de {caller}. Es hora de tomar su medicina. "
-        "Si ya la tomó, marque 1. Para escuchar de nuevo, marque 2. Para dejar de recibir estas llamadas, marque 9.",
-        "consent_yes": "Gracias. Le llamaremos a cada hora del recordatorio. "
-        "Para dejar de recibir las llamadas, marque 9 durante cualquier llamada. Adiós.",
+        "Si ya la tomó, marque 1. Para escuchar este mensaje otra vez, marque 2. Para dejar de recibir estas llamadas, marque 9.",
+        "consent_yes": "Gracias. Le llamaremos cada vez que sea hora de su recordatorio. "
+        "Si quiere dejar de recibirlas, marque 9 durante cualquier llamada. Adiós.",
         "taken": "Gracias. Se lo diremos a {caller}. Adiós.",
-        "stopped": "Muy bien. Las llamadas de recordatorio están desactivadas. No recibirá más. Adiós.",
-        "no_answer": "No escuchamos ninguna tecla. Adiós por ahora.",
+        "stopped": "Muy bien. Las llamadas de recordatorio están desactivadas. No recibirá más llamadas. Adiós.",
+        "no_answer": "No recibimos ninguna respuesta. Adiós por ahora.",
         "unknown": "Este recordatorio ya no está activo. Adiós.",
         "callback": "Para comunicarse con FollowThrough Health, llame al {number}.",
         "family": "su familia",

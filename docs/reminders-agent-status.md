@@ -2,7 +2,7 @@
 
 Read this first at the start of every reminders run. Update it at the end.
 
-Last run: 2026-10-23. Code checked: backend `07f9aa2`, frontend `8d6e756`, mobile `a1a0ce3`.
+Last run: 2026-10-25 (daily run, 13:56 UTC). Previous: 2026-10-23. Code checked: backend `07f9aa2`, frontend `8d6e756`, mobile `a1a0ce3`.
 Clinical rules seen: candidate `2026-10-20.2`, live rules `2026-10-20.5` (frontend `script.js`).
 Reminder work never touches clinical rules.
 
@@ -44,6 +44,7 @@ Twilio's own delivery result (rang, busy, no answer) is not read yet.
 
 ## Known problems (highest first)
 
+0. **Critical: the "every 5 minutes" scheduler runs only every 1 to 5 hours.** GitHub delays scheduled jobs on busy days. Scheduled Jobs runs on 24 and 25 Oct (UTC): 12:03, 13:39, 16:59, 19:24, 21:44, 23:47, 01:46, 06:59, 12:30, 12:36. A reminder time gets an event only if the scheduler runs within 15 minutes after it, so most reminder times are skipped: no call, no "not confirmed" email. The hourly health check now counts these (`skipped_times`) and will turn red once this change is deployed. Real fix needs your approval: a dependable scheduler (see "Needs your approval").
 1. **High: no real phone notifications.** The mobile app only shows a list. Nothing alerts the phone unless phone calls or the calendar file are used.
 2. **High: two separate reminder features on the website.** "Medicine reminders" (account) and "Reminder planner" (browser only, no alerts). Confusing, and planner items are lost when the browser is cleared.
 3. **Medium: Twilio failures are not alerted.** `call_failures` shows only in the Actions log. A stopped scheduler is now caught by the hourly health check (after #44 is merged and deployed).
@@ -64,7 +65,7 @@ Twilio's own delivery result (rang, busy, no answer) is not read yet.
 
 - `scheduled-jobs.yml`: every 5 minutes. A failed request makes the run fail (red in GitHub Actions).
 - The dispatch reply includes `created`, `calls`, `call_failures`, `missed`. These are counts only, with no health data.
-- `reminders-health.yml` (after #44): every hour, calls `GET /reminders/health`. Fails when `stuck_events` is above 0. GitHub shows a red run, and can email you, depending on your GitHub notification settings.
+- `reminders-health.yml` (live since #44 merged; verified 2026-10-24 23:23 UTC, reply `healthy: true, stuck_events: 0`): every hour, calls `GET /reminders/health`. Fails when `stuck_events` or `skipped_times` (reminder times in the last 3 hours that never got an event) is above 0. GitHub shows a red run, and can email you, depending on your GitHub notification settings.
 - Not yet: an alert when `call_failures` is high.
 
 ## Phone testing
@@ -95,12 +96,13 @@ Nothing has been tested on a physical phone. Do not mark any item passed until i
 ## Automation
 
 - 5-minute reminder scheduler and nightly cleanup: GitHub Actions `scheduled-jobs.yml` (running).
-- Hourly reminder health check: GitHub Actions `reminders-health.yml` (starts after #44 is merged and deployed).
-- Daily agent run: a Claude scheduled task "FollowThrough reminders daily run", 13:55 UTC. It starts a fresh session that reads this file, fixes red PRs or the next safe task, and opens at most one PR. It has no connectors (Gmail, Render), which it does not need.
+- Hourly reminder health check: GitHub Actions `reminders-health.yml` (running and reaching the live API).
+- Daily agent run: Claude scheduled task "FollowThrough reminders daily run", 13:55 UTC, into the original reminders session (which has the repos and GitHub access). The first version started empty sessions with no repo and did nothing on 2026-10-24; replaced on 2026-10-25.
 - Reminder delivery never depends on Claude: it runs on GitHub Actions and the API.
 
 ## Needs your approval
 
+- **A dependable scheduler for reminders (most urgent).** GitHub's schedule is too late for medicine times. Options: a Render cron job running `python scripts/dispatch_reminders.py` every 5 minutes (a paid Render feature; check the price in Render first), or a paid always-on API service with an in-process timer. Nothing was bought or set up.
 - Turning on Twilio calls or reminder emails for real users.
 - Adding a phone notification library to the mobile app (new permission, store disclosure changes).
 - Any database change (for example a column for Twilio's call result).
@@ -108,6 +110,6 @@ Nothing has been tested on a physical phone. Do not mark any item passed until i
 
 ## Next three tasks
 
-1. Design note and mockup: one reminder list on the website (merge the planner into account reminders), with appointment and lab follow-up types that need a user-confirmed date.
-2. Plan local notifications for iOS and Android (Expo notifications), with the checklists above. Needs approval before adding the library.
-3. Alert on repeated Twilio failures (count them in `/reminders/health` without storing health data).
+1. Once a scheduler is approved: set it up as a Render cron job (the script already exists), then confirm `skipped_times` stays 0 for a day.
+2. Design note and mockup: one reminder list on the website (merge the planner into account reminders), with appointment and lab follow-up types that need a user-confirmed date.
+3. Plan local notifications for iOS and Android (Expo notifications), with the checklists above. Needs approval before adding the library.

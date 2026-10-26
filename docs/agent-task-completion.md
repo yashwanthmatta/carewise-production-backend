@@ -4,7 +4,7 @@
 
 **Assigned task:** Make reminders reliable, private and easy to use on the website, iPhone and Android, with tests, monitoring and recurring automation. Details: `docs/reminders-agent-status.md`.
 
-**Status: PARTIALLY COMPLETE** (2026-10-23)
+**Status: PARTIALLY COMPLETE** (updated 2026-10-25)
 
 ### Requirements and state
 
@@ -15,7 +15,7 @@
 | Time zone and daylight-saving tests | Done, passing | `tests/api/test_reminders.py` (fall back, spring forward, Tokyo) |
 | Lock-screen privacy | Fixed for the calendar file; calls and emails already generic | frontend PR #107, `scripts/reminder_calendar_test.mjs` |
 | Honest status (tried vs delivered) | Fixed for the email; Twilio delivery result not read yet | backend PR #44 |
-| Monitoring independent of Claude | Built: hourly health check | `.github/workflows/reminders-health.yml`, `GET /reminders/health` |
+| Monitoring independent of Claude | Live and verified: hourly health check returns healthy from the production API | `.github/workflows/reminders-health.yml`, `GET /reminders/health` |
 | Recurring agent runs | Set up: daily Claude scheduled task | status file, "Automation" |
 | Phone test checklists | Written | status file, "Phone testing" |
 | Status document | Done | `docs/reminders-agent-status.md` |
@@ -43,9 +43,11 @@
 
 ### Blockers and approvals needed
 
+- **Approve a dependable reminder scheduler.** GitHub runs the 5-minute job only every 1 to 5 hours, so most reminder times are skipped. The health check now detects this (`skipped_times`).
+
 - Approve a database table for appointment and follow-up reminders.
 - Approve adding phone notifications to the mobile app (new permission; App Store and Play Store disclosures change).
-- Merge #44 and #107. The hourly health check works only once #44 is deployed.
+- Merge frontend #107 (backend #44 is merged and live). #107 was brought up to date with main on 2026-10-25.
 - Import the calendar file once into Apple Calendar and Google Calendar on a real phone.
 
 ## Round 3 independent code review (2026-10-23)
@@ -86,7 +88,7 @@ mobile changes, and the security/legal items from the 2026-10-22 assessment.
 Reproduce defects with synthetic data, fix the verified ones, add tests, open PRs and keep a
 re-check register. Register: `docs/code-review-recheck.md`.
 
-**Status: PARTIALLY COMPLETE** (2026-10-23)
+**Status: PARTIALLY COMPLETE** (updated 2026-10-25)
 
 ### Requirements and state
 

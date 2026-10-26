@@ -2,7 +2,7 @@
 
 Read this first at the start of every reminders run. Update it at the end.
 
-Last run: 2026-10-25 (daily run, 13:56 UTC). Previous: 2026-10-23. Code checked: backend `07f9aa2`, frontend `8d6e756`, mobile `a1a0ce3`.
+Last run: 2026-10-26 (daily run, 13:57 UTC). Previous: 2026-10-25.
 Clinical rules seen: candidate `2026-10-20.2`, live rules `2026-10-20.5` (frontend `script.js`).
 Reminder work never touches clinical rules.
 
@@ -44,15 +44,17 @@ Twilio's own delivery result (rang, busy, no answer) is not read yet.
 
 ## Known problems (highest first)
 
-0. **Critical: the "every 5 minutes" scheduler runs only every 1 to 5 hours.** GitHub delays scheduled jobs on busy days. Scheduled Jobs runs on 24 and 25 Oct (UTC): 12:03, 13:39, 16:59, 19:24, 21:44, 23:47, 01:46, 06:59, 12:30, 12:36. A reminder time gets an event only if the scheduler runs within 15 minutes after it, so most reminder times are skipped: no call, no "not confirmed" email. The hourly health check now counts these (`skipped_times`) and will turn red once this change is deployed. Real fix needs your approval: a dependable scheduler (see "Needs your approval").
+0. **Critical: the "every 5 minutes" scheduler runs only every 1 to 5 hours.** GitHub delays scheduled jobs on busy days. Scheduled Jobs runs on 24 and 25 Oct (UTC): 12:03, 13:39, 16:59, 19:24, 21:44, 23:47, 01:46, 06:59, 12:30, 12:36. A reminder time gets an event only if the scheduler runs within 15 minutes after it, so most reminder times are skipped: no call, no "not confirmed" email. The hourly health check counts these (`skipped_times`, live since #50; first live reply 2026-10-26 01:53 UTC: all counts 0, most likely because no reminder times fell in the window). Scheduled Jobs runs on 25 and 26 Oct (UTC): 16:45, 19:19, 21:56, 23:57, 04:25, 10:23. Real fix needs your approval: a dependable scheduler (see "Needs your approval").
 1. **High: no real phone notifications.** The mobile app only shows a list. Nothing alerts the phone unless phone calls or the calendar file are used.
 2. **High: two separate reminder features on the website.** "Medicine reminders" (account) and "Reminder planner" (browser only, no alerts). Confusing, and planner items are lost when the browser is cleared.
-3. **Medium: Twilio failures are not alerted.** `call_failures` shows only in the Actions log. A stopped scheduler is now caught by the hourly health check (after #44 is merged and deployed).
+3. **Medium: Twilio failures are not alerted.** `call_failures` shows only in the Actions log.
 4. **Medium: Twilio call result is not read.** The app cannot tell "rang" from "accepted by Twilio".
 5. **Medium: no snooze, no completed history, no appointment or lab follow-up reminder types.**
 6. **Low: the scheduler depends on GitHub Actions timing,** which can lag by several minutes at busy times.
 
 ## Privacy checks
+
+- Next-test calendar reminder (lab result screen): generic title and right date in every time zone. Frontend PR #134 (2026-10-26). It used to say "Time for your next labs for <name>" and landed a day early in time zones ahead of UTC+12.
 
 - Call script never says medicine names or doses (tested).
 - Missed email never includes the reminder label (tested).

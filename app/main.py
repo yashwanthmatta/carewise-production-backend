@@ -30,6 +30,7 @@ from app.api.routes import (
     subscriptions,
 )
 from app.core.config import settings
+from app.core.crypto import FieldDecryptionError
 from app.db.init_db import init_local_database
 from app.services.telemetry import configure_telemetry
 from app.services.security_headers import apply_security_headers
@@ -68,6 +69,18 @@ def create_app() -> FastAPI:
             apply_security_headers(response)
             return response
         response = await call_next(request)
+        apply_security_headers(response)
+        return response
+
+    @app.exception_handler(FieldDecryptionError)
+    async def field_decryption_failed(request, error: FieldDecryptionError):
+        # Never show a blank or made-up value in place of health information. The log names the
+        # key id only, never the value or the key.
+        logger.error("field_decryption_failed path=%s key_id=%s", request.url.path, error.key_id)
+        response = JSONResponse(
+            status_code=500,
+            content={"detail": "Some saved information could not be read right now. Nothing was changed. Please try again later."},
+        )
         apply_security_headers(response)
         return response
 

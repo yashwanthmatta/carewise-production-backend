@@ -1,3 +1,5 @@
+import base64
+import binascii
 from functools import lru_cache
 
 from pydantic import AliasChoices, Field
@@ -29,6 +31,12 @@ class Settings(BaseSettings):
     redis_url: str = ""
     jwt_secret: str = "replace-me"
     field_encryption_key: str = "replace-with-fernet-key"
+    # Optional extra keys for rotation, "k2:<fernet key>,k3:<fernet key>", and which one encrypts
+    # new values. The original field_encryption_key is always key id "k1".
+    field_encryption_keys: str = ""
+    field_encryption_current_key_id: str = ""
+    # Set only after every value has been moved off k1 and verified (docs/security-hardening/key-rotation.md).
+    field_encryption_key1_retired: bool = False
     access_token_minutes: int = 30
     refresh_token_days: int = 30
     allowed_origins: str = "http://localhost:4173,http://localhost:3000"
@@ -161,6 +169,37 @@ class Settings(BaseSettings):
         return self.clean_env_value(self.field_encryption_key)
 
     @property
+    def field_encryption_key_ring(self) -> tuple[str, dict[str, str]]:
+        """(current key id, {key id: key}). Raises ValueError on a malformed setting."""
+        keys = {} if self.field_encryption_key1_retired else {"k1": self.clean_field_encryption_key}
+        # Not clean_env_value: Fernet keys end in "=", which that helper treats as a NAME=value
+        # separator. Only a pasted "CAREWISE_FIELD_ENCRYPTION_KEYS=" prefix is removed here.
+        raw_keys = self.field_encryption_keys.strip().strip('"').strip("'")
+        raw_keys = raw_keys.removeprefix("CAREWISE_FIELD_ENCRYPTION_KEYS=")
+        for entry in raw_keys.split(","):
+            entry = entry.strip()
+            if not entry:
+                continue
+            key_id, separator, key = entry.partition(":")
+            key_id, key = key_id.strip(), key.strip()
+            if not separator or not key_id or not key or not key_id.isalnum():
+                raise ValueError("CAREWISE_FIELD_ENCRYPTION_KEYS entries must look like k2:<fernet key>.")
+            if key_id == "k1":
+                raise ValueError("Key id k1 is CAREWISE_FIELD_ENCRYPTION_KEY; give extra keys other ids.")
+            if key_id in keys:
+                raise ValueError(f"Key id {key_id} appears twice in CAREWISE_FIELD_ENCRYPTION_KEYS.")
+            try:
+                if len(base64.urlsafe_b64decode(key.encode("ascii"))) != 32:
+                    raise ValueError
+            except (ValueError, binascii.Error) as error:
+                raise ValueError(f"Key {key_id} in CAREWISE_FIELD_ENCRYPTION_KEYS is not a valid Fernet key.") from error
+            keys[key_id] = key
+        current = self.clean_env_value(self.field_encryption_current_key_id) or ("" if self.field_encryption_key1_retired else "k1")
+        if current not in keys:
+            raise ValueError(f"CAREWISE_FIELD_ENCRYPTION_CURRENT_KEY_ID {current} is not a configured key id.")
+        return current, keys
+
+    @property
     def clean_otel_exporter_otlp_endpoint(self) -> str:
         return self.clean_env_value(self.otel_exporter_otlp_endpoint)
 
@@ -238,12 +277,18 @@ class Settings(BaseSettings):
             return
 
         missing = []
-        for field_name in ("database_url", "jwt_secret", "field_encryption_key"):
+        required = ["database_url", "jwt_secret"] + ([] if self.field_encryption_key1_retired else ["field_encryption_key"])
+        for field_name in required:
             if self.clean_env_value(getattr(self, field_name)) in PLACEHOLDER_VALUES:
                 missing.append(f"CAREWISE_{field_name.upper()}")
 
         if "localhost" in self.sqlalchemy_database_url or "@localhost" in self.sqlalchemy_database_url:
             missing.append("CAREWISE_DATABASE_URL production host")
+
+        try:
+            self.field_encryption_key_ring
+        except ValueError as error:
+            missing.append(str(error))
 
         storage_config = self.storage_configuration
         if not storage_config["ready"]:

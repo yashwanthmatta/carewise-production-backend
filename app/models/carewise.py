@@ -502,3 +502,20 @@ class ReminderEvent(Base):
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CareAccessGrant(Base):
+    # A patient letting one named clinician see their records. Nothing else gives a clinician
+    # access to a patient. Revoking sets revoked_at; the row is kept as the record of the grant.
+    __tablename__ = "care_access_grants"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("grant"))
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    staff_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    granted_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+Index("idx_care_grants_staff_patient", CareAccessGrant.staff_user_id, CareAccessGrant.patient_id)

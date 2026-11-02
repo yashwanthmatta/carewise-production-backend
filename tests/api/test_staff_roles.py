@@ -73,4 +73,8 @@ def test_staff_role_waits_for_email_verification(monkeypatch):
 
         verify_email("newdoc@clinic.org")
         assert client.get("/auth/me", headers=headers).json()["role"] == "clinician"
+        # Being a verified clinician is not enough: the patient has to add them to their care team.
+        assert client.get(f"/lab-trends?patient_id={patient_id}", headers=headers).status_code == 403
+        added = client.post(f"/patients/{patient_id}/care-team", json={"clinician_email": "newdoc@clinic.org"}, headers=patient_headers)
+        assert added.status_code == 200, added.text
         assert client.get(f"/lab-trends?patient_id={patient_id}", headers=headers).status_code == 200

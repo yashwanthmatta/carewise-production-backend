@@ -129,6 +129,10 @@ class Settings(BaseSettings):
     # Clinician and admin roles are never self-assigned. List staff as
     # "email:role" pairs, e.g. "doctor@clinic.org:clinician,me@carewise.app:admin".
     staff_emails: str = ""
+    # "grants" (default): a clinician sees a patient's records only after that patient adds them
+    # to their care team, and admins have no clinical access. "legacy_global" restores the old
+    # rule (every verified clinician and admin can open every profile) for a staged changeover.
+    staff_access_mode: str = "grants"
 
     def staff_role_for(self, email: str) -> str | None:
         wanted = (email or "").strip().lower()

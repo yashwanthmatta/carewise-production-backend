@@ -549,3 +549,9 @@ class ReminderOut(BaseModel):
 
 class ReminderTakenIn(BaseModel):
     time: str = Field(default="", max_length=5)
+
+
+class CareTeamGrantIn(BaseModel):
+    clinician_email: str = Field(min_length=3, max_length=320)
+    # Empty or 0 means until the patient removes it.
+    days: int | None = Field(default=None, ge=0, le=365)

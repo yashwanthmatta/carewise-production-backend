@@ -8,14 +8,13 @@ from app.schemas.carewise import ReviewDecisionIn
 from app.services.audit import write_audit
 
 
-def list_review_queue(db: Session, limit: int = 50, offset: int = 0) -> list[dict]:
-    statement = (
-        select(CarePlan)
-        .where(CarePlan.status == "pending_review")
-        .order_by(CarePlan.created_at.desc())
-        .limit(min(limit, 100))
-        .offset(max(offset, 0))
-    )
+def list_review_queue(db: Session, limit: int = 50, offset: int = 0, patient_ids: list[str] | None = None) -> list[dict]:
+    """Care plans waiting for review. patient_ids limits the queue to those patients (a
+    clinician's care-team grants); None means every patient (legacy mode only)."""
+    statement = select(CarePlan).where(CarePlan.status == "pending_review")
+    if patient_ids is not None:
+        statement = statement.where(CarePlan.patient_id.in_(patient_ids))
+    statement = statement.order_by(CarePlan.created_at.desc()).limit(min(limit, 100)).offset(max(offset, 0))
     plans = db.scalars(statement).all()
     return [
         {

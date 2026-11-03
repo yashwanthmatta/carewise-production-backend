@@ -17,7 +17,9 @@ from app.models.carewise import (
     ClinicMember,
     DataDeletionRequest,
     DoctorShare,
+    CareAccessGrant,
     MedicineReminder,
+    UserIdentity,
     ReminderEvent,
     DraftEdit,
     LabPacket,
@@ -251,6 +253,7 @@ def delete_my_account_data(
         db.execute(delete(CarePlan).where(CarePlan.patient_id.in_(patient_ids)))
         db.execute(delete(Intake).where(Intake.patient_id.in_(patient_ids)))
         db.execute(delete(Medication).where(Medication.patient_id.in_(patient_ids)))
+        db.execute(delete(CareAccessGrant).where(CareAccessGrant.patient_id.in_(patient_ids)))
         db.execute(delete(PatientProfile).where(PatientProfile.id.in_(patient_ids)))
 
     db.execute(delete(ConsentRecord).where(ConsentRecord.user_id == user.user_id))
@@ -275,6 +278,9 @@ def delete_my_account_data(
         db.execute(delete(ClinicMember).where(ClinicMember.clinic_id.in_(owned_clinic_ids)))
         db.execute(delete(Clinic).where(Clinic.id.in_(owned_clinic_ids)))
     db.execute(delete(ClinicMember).where(ClinicMember.user_id == user.user_id))
+    # Grants that let this account see other patients' records, and its sign-in identities.
+    db.execute(delete(CareAccessGrant).where(CareAccessGrant.staff_user_id == user.user_id))
+    db.execute(delete(UserIdentity).where(UserIdentity.user_id == user.user_id))
     db.execute(delete(RefreshToken).where(RefreshToken.user_id == user.user_id))
     db.execute(delete(PasswordResetToken).where(PasswordResetToken.user_id == user.user_id))
     db.execute(delete(EmailVerificationToken).where(EmailVerificationToken.user_id == user.user_id))

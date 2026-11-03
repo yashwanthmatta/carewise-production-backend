@@ -519,3 +519,35 @@ class CareAccessGrant(Base):
 
 
 Index("idx_care_grants_staff_patient", CareAccessGrant.staff_user_id, CareAccessGrant.patient_id)
+
+
+class UserIdentity(Base):
+    # A way to sign in to one account: Google, Apple or Microsoft (by the provider's stable
+    # subject id, never by email). An identity belongs to exactly one account, and is added
+    # only by signing in with it, or by a signed-in user who then signs in with the provider.
+    __tablename__ = "user_identities"
+    __table_args__ = (UniqueConstraint("provider", "subject", name="uq_identity_provider_subject"),)
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("ident"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    subject: Mapped[str] = mapped_column(String(255))
+    # The email the provider reported when the identity was linked, for display only.
+    email: Mapped[str] = mapped_column(EncryptedText, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AuthFlowToken(Base):
+    # Short-lived, single-use values for provider sign-in: the OAuth state (kind "state",
+    # with the PKCE verifier and nonce) and the one-time hand-off code the browser trades
+    # for tokens (kind "handoff"). Only hashes of the values are stored.
+    __tablename__ = "auth_flow_tokens"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("flow"))
+    kind: Mapped[str] = mapped_column(String(12))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    payload: Mapped[str] = mapped_column(EncryptedText, default="")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

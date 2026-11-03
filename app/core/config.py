@@ -118,6 +118,20 @@ class Settings(BaseSettings):
     # (FCC rule for prerecorded calls, 47 CFR 64.1200(b)(2)). Empty: no callback line.
     reminder_callback_number: str = ""
     public_api_url: str = "https://carewise-api.onrender.com"
+    # "Continue with Google / Apple / Microsoft". A provider is offered only when every
+    # value it needs is set. Client secrets and the Apple key stay on the server.
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    microsoft_client_id: str = ""
+    microsoft_client_secret: str = ""
+    apple_client_id: str = ""  # the Services ID, for example com.followthroughhealth.signin
+    apple_team_id: str = ""
+    apple_key_id: str = ""
+    apple_private_key: str = ""  # the .p8 contents; literal "\n" sequences are accepted
+    # Where the browser returns after a provider sign-in. Fixed values only: the API never
+    # redirects to an address the request supplies.
+    sign_in_web_return_url: str = ""
+    sign_in_app_return_url: str = "carewise://auth"
     reminder_cron_token: str = ""
     # DocBridge email intake. Clinics forward lab PDFs to labs+CODE@<inbound_email_domain>;
     # the email provider posts each message to /inbound/email/<inbound_email_token>.

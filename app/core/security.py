@@ -30,7 +30,13 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, hashed_password: str) -> bool:
-    return password_context.verify(password, hashed_password)
+    # Accounts made with Google, Apple or Microsoft have no password (empty hash).
+    if not hashed_password:
+        return False
+    try:
+        return password_context.verify(password, hashed_password)
+    except (ValueError, TypeError):
+        return False
 
 
 def create_reset_token() -> str:

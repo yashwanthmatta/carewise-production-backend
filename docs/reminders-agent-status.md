@@ -2,7 +2,7 @@
 
 Read this first at the start of every reminders run. Update it at the end.
 
-Last run: 2026-10-26 (daily run, 13:57 UTC). Previous: 2026-10-25.
+Last run: 2026-11-03 (daily run). Previous: 2026-10-26.
 Clinical rules seen: candidate `2026-10-20.2`, live rules `2026-10-20.5` (frontend `script.js`).
 Reminder work never touches clinical rules.
 
@@ -54,7 +54,7 @@ Twilio's own delivery result (rang, busy, no answer) is not read yet.
 
 ## Privacy checks
 
-- Next-test calendar reminder (lab result screen): generic title and right date in every time zone. Frontend PR #134 (2026-10-26). It used to say "Time for your next labs for <name>" and landed a day early in time zones ahead of UTC+12.
+- Next-test calendar reminder (lab result screen): generic title and right date in every time zone. Frontend PR #134 (merged 2026-11-03). It used to say "Time for your next labs for <name>" and landed a day early in time zones ahead of UTC+12.
 
 - Call script never says medicine names or doses (tested).
 - Missed email never includes the reminder label (tested).
@@ -113,5 +113,5 @@ Nothing has been tested on a physical phone. Do not mark any item passed until i
 ## Next three tasks
 
 1. Once a scheduler is approved: set it up as a Render cron job (the script already exists), then confirm `skipped_times` stays 0 for a day.
-2. Design note and mockup: one reminder list on the website (merge the planner into account reminders), with appointment and lab follow-up types that need a user-confirmed date.
+2. One reminder list on the website: plan written in frontend `docs/reminders-one-list-plan.md` (PR #141). Waiting for your OK on step 1 (website only) and approval of the database table for step 2.
 3. Plan local notifications for iOS and Android (Expo notifications), with the checklists above. Needs approval before adding the library.

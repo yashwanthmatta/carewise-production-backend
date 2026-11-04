@@ -48,7 +48,7 @@ def create_lab_trend(
         "lab_trend_saved",
         "lab_trend",
         trend.id,
-        {"test_name": trend.test_name, "source": trend.source, "report_id": trend.report_id or ""},
+        {"source": trend.source, "report_id": trend.report_id or ""},
     )
     db.commit()
     return lab_trend_out(trend)

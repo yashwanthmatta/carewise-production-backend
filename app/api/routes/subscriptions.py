@@ -53,8 +53,9 @@ SUBSCRIPTION_PLANS = {
         "name": "Family",
         "monthly_price_usd": 12,
         "stripe_lookup_key": "carewise_family_monthly",
-        "summary": "Everything in Plus for up to 5 people, shared with caregivers.",
-        "features": ["Everything in Plus", "Up to 5 family members", "Shared with siblings and caregivers"],
+        # Caregiver sharing is not built yet; the website pricing card says "coming later" too.
+        "summary": "Everything in Plus for up to 5 family members in one account.",
+        "features": ["Everything in Plus", "Up to 5 family members", "Sharing with siblings and caregivers: coming later"],
     },
 }
 

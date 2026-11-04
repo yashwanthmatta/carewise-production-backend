@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.crypto import EncryptedText
 from app.db.base import Base
 
 
@@ -85,11 +86,11 @@ class PatientProfile(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     encrypted_name: Mapped[str] = mapped_column(Text, default="")
     encrypted_date_of_birth: Mapped[str] = mapped_column(Text, default="")
-    sex_at_birth: Mapped[str] = mapped_column(String(40), default="")
+    sex_at_birth: Mapped[str] = mapped_column(EncryptedText, default="")
     encrypted_conditions: Mapped[str] = mapped_column(Text, default="")
     encrypted_allergies: Mapped[str] = mapped_column(Text, default="")
-    location_region: Mapped[str] = mapped_column(String(120), index=True, default="")
-    insurance_status: Mapped[str] = mapped_column(String(80), default="")
+    location_region: Mapped[str] = mapped_column(EncryptedText, default="")
+    insurance_status: Mapped[str] = mapped_column(EncryptedText, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="patient_profile")
@@ -127,9 +128,9 @@ class Intake(Base):
     id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("intake"))
     patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
     encrypted_symptom_text: Mapped[str] = mapped_column(Text)
-    goals_json: Mapped[str] = mapped_column(Text, default="[]")
-    diet_style: Mapped[str] = mapped_column(String(80), default="")
-    activity_level: Mapped[str] = mapped_column(String(80), default="")
+    goals_json: Mapped[str] = mapped_column(EncryptedText, default="[]")
+    diet_style: Mapped[str] = mapped_column(EncryptedText, default="")
+    activity_level: Mapped[str] = mapped_column(EncryptedText, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -141,10 +142,10 @@ class CarePlan(Base):
     intake_id: Mapped[str] = mapped_column(ForeignKey("intakes.id"), index=True)
     risk_level: Mapped[str] = mapped_column(String(80), index=True)
     status: Mapped[str] = mapped_column(String(80), index=True, default="pending_review")
-    emergency_flags_json: Mapped[str] = mapped_column(Text, default="[]")
-    matched_conditions_json: Mapped[str] = mapped_column(Text, default="[]")
-    recommendation_json: Mapped[str] = mapped_column(Text, default="{}")
-    clinician_note: Mapped[str] = mapped_column(Text, default="")
+    emergency_flags_json: Mapped[str] = mapped_column(EncryptedText, default="[]")
+    matched_conditions_json: Mapped[str] = mapped_column(EncryptedText, default="[]")
+    recommendation_json: Mapped[str] = mapped_column(EncryptedText, default="{}")
+    clinician_note: Mapped[str] = mapped_column(EncryptedText, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -168,7 +169,7 @@ class ReportUpload(Base):
     id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("report"))
     patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
     uploaded_by: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
-    file_name: Mapped[str] = mapped_column(String(255), default="")
+    file_name: Mapped[str] = mapped_column(EncryptedText, default="")
     content_type: Mapped[str] = mapped_column(String(120), default="")
     storage_key: Mapped[str] = mapped_column(Text, default="")
     storage_url: Mapped[str] = mapped_column(Text, default="")
@@ -185,8 +186,8 @@ class ReportAnalysis(Base):
     report_id: Mapped[str] = mapped_column(ForeignKey("report_uploads.id"), index=True)
     patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
     risk_level: Mapped[str] = mapped_column(String(80), index=True, default="routine")
-    summary_json: Mapped[str] = mapped_column(Text, default="{}")
-    recommendations_json: Mapped[str] = mapped_column(Text, default="{}")
+    summary_json: Mapped[str] = mapped_column(EncryptedText, default="{}")
+    recommendations_json: Mapped[str] = mapped_column(EncryptedText, default="{}")
     status: Mapped[str] = mapped_column(String(80), index=True, default="draft")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -197,11 +198,11 @@ class LabTrend(Base):
     id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("lab"))
     patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
     report_id: Mapped[str | None] = mapped_column(ForeignKey("report_uploads.id"), index=True, nullable=True)
-    test_name: Mapped[str] = mapped_column(String(160), index=True)
-    value: Mapped[str] = mapped_column(String(80), default="")
-    unit: Mapped[str] = mapped_column(String(80), default="")
+    test_name: Mapped[str] = mapped_column(EncryptedText)
+    value: Mapped[str] = mapped_column(EncryptedText, default="")
+    unit: Mapped[str] = mapped_column(EncryptedText, default="")
     observed_on: Mapped[str] = mapped_column(String(40), index=True, default="")
-    flag: Mapped[str] = mapped_column(String(80), index=True, default="not_sure")
+    flag: Mapped[str] = mapped_column(EncryptedText, default="not_sure")
     encrypted_notes: Mapped[str] = mapped_column(Text, default="")
     source: Mapped[str] = mapped_column(String(80), index=True, default="manual")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -257,7 +258,7 @@ class DataDeletionRequest(Base):
     user_id: Mapped[str] = mapped_column(String(80), index=True)
     email: Mapped[str] = mapped_column(String(320), index=True, default="")
     status: Mapped[str] = mapped_column(String(80), index=True, default="requested")
-    reason: Mapped[str] = mapped_column(Text, default="")
+    reason: Mapped[str] = mapped_column(EncryptedText, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -269,7 +270,6 @@ Index("idx_consent_region_created", ConsentRecord.region, ConsentRecord.created_
 Index("idx_reports_patient_created", ReportUpload.patient_id, ReportUpload.created_at.desc())
 Index("idx_analyses_patient_created", ReportAnalysis.patient_id, ReportAnalysis.created_at.desc())
 Index("idx_lab_trends_patient_observed", LabTrend.patient_id, LabTrend.observed_on.desc())
-Index("idx_lab_trends_patient_test", LabTrend.patient_id, LabTrend.test_name)
 Index("idx_deletion_requests_user_created", DataDeletionRequest.user_id, DataDeletionRequest.created_at.desc())
 Index("idx_password_reset_user_created", PasswordResetToken.user_id, PasswordResetToken.created_at.desc())
 Index("idx_refresh_tokens_user_created", RefreshToken.user_id, RefreshToken.created_at.desc())
@@ -501,4 +501,53 @@ class ReminderEvent(Base):
     last_call_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CareAccessGrant(Base):
+    # A patient letting one named clinician see their records. Nothing else gives a clinician
+    # access to a patient. Revoking sets revoked_at; the row is kept as the record of the grant.
+    __tablename__ = "care_access_grants"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("grant"))
+    patient_id: Mapped[str] = mapped_column(ForeignKey("patient_profiles.id"), index=True)
+    staff_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    granted_by: Mapped[str] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+Index("idx_care_grants_staff_patient", CareAccessGrant.staff_user_id, CareAccessGrant.patient_id)
+
+
+class UserIdentity(Base):
+    # A way to sign in to one account: Google, Apple or Microsoft (by the provider's stable
+    # subject id, never by email). An identity belongs to exactly one account, and is added
+    # only by signing in with it, or by a signed-in user who then signs in with the provider.
+    __tablename__ = "user_identities"
+    __table_args__ = (UniqueConstraint("provider", "subject", name="uq_identity_provider_subject"),)
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("ident"))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(20))
+    subject: Mapped[str] = mapped_column(String(255))
+    # The email the provider reported when the identity was linked, for display only.
+    email: Mapped[str] = mapped_column(EncryptedText, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AuthFlowToken(Base):
+    # Short-lived, single-use values for provider sign-in: the OAuth state (kind "state",
+    # with the PKCE verifier and nonce) and the one-time hand-off code the browser trades
+    # for tokens (kind "handoff"). Only hashes of the values are stored.
+    __tablename__ = "auth_flow_tokens"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True, default=lambda: new_id("flow"))
+    kind: Mapped[str] = mapped_column(String(12))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    payload: Mapped[str] = mapped_column(EncryptedText, default="")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -18,7 +18,7 @@ Last updated: 2026-11-02.
 | 5 | MFA for privileged staff | backend + web | NOT STARTED | TOTP two-step sign-in already exists (0016) | — | Enforcement for staff roles; recovery codes; staged rollout | Review before enforcement | — |
 | 6 | Your Data privacy centre | web + backend | NOT STARTED | Export and deletion APIs exist (`/privacy/me/export`, `DELETE /privacy/me`) | — | Page, activity list, deletion flow | — | — |
 | 7 | Retention, deletion, export, audit | backend | NOT STARTED | — | — | — | — | — |
-| 8 | Automated security tests and monitoring | backend CI | PARTIALLY COMPLETE | Encryption and rotation tests run in Backend CI with every PR | — | Authorization matrix tests; dependency audit; weekly drift check of `ipAllowList` and key configuration | — | — |
+| 8 | Automated security tests and monitoring | backend CI | PARTIALLY COMPLETE | Encryption and rotation tests run in Backend CI with every PR. Dependency audit (`dependency-audit.yml`, pip-audit) on dependency changes and weekly, added 2026-11-04; it found pypdf 6.21.2 with 7 advisories, and the minimum is now 6.21.4 | — | Authorization matrix tests; dependency audit; weekly drift check of `ipAllowList` and key configuration | — | — |
 | 9 | Privacy-safe analytics | backend + web | NOT STARTED | `usage_counters` already stores counts only | — | Document; review events | — | — |
 | 10 | Legal and HIPAA readiness checklist | docs | NOT STARTED | — | — | Checklist for counsel; BAAs (Render, AWS, Anthropic, OpenAI, email, Twilio) | Licensed counsel | — |
 

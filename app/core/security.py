@@ -90,6 +90,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
             # the person has proved they own the listed email address. Until then the
             # account acts as a patient; the stored role is kept for after verification.
             role = "patient"
+        elif role != "patient" and settings.staff_two_factor_required and not user.totp_enabled:
+            # With staff two-step sign-in required, a staff account without it works as a
+            # patient account: it can still sign in and turn two-step sign-in on (so nobody
+            # is locked out), and its staff role takes effect once it is on.
+            role = "patient"
         return CurrentUser(
             user_id=user.id,
             email=user.email,

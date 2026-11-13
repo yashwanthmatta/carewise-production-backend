@@ -108,3 +108,39 @@ def test_plan_list_does_not_sell_caregiver_sharing():
     text = " ".join([family["summary"], *family["features"]]).lower()
     assert "caregiver" not in text or "coming later" in text
     assert family["monthly_price_usd"] == 12  # wording fix only; price unchanged
+
+
+def test_helper_answers_like_a_clinician_but_keeps_every_safety_rule():
+    """The helper explains health questions in depth, clinician style, without ever acting as a
+    doctor: no diagnosis, no medicine names or doses, emergencies first, exact numbers only."""
+    from app.api.routes.assistant import SYSTEM_PROMPT
+
+    # Safety rules stay word for word.
+    for rule in (
+        "You do not diagnose",
+        "Never name medicines, supplements or doses",
+        "call 911 or their local emergency number now",
+        "Do not claim FollowThrough Health is HIPAA compliant or clinically validated",
+        "You cannot see scan images",
+        "You are not a doctor and never say or imply that you are",
+    ):
+        assert rule in SYSTEM_PROMPT, rule
+    # Clinician-style explanations.
+    for guide in (
+        "what the test or term measures",
+        "Never round or change a number",
+        "several possibilities",
+        "what doctors usually look at next",
+        "questions to ask their doctor",
+        "when to contact their doctor soon",
+        "Do not alarm and do not falsely reassure",
+    ):
+        assert guide in SYSTEM_PROMPT, guide
+    assert "under 120 words" not in SYSTEM_PROMPT
+
+
+def test_helper_uses_medium_effort(monkeypatch):
+    messages = fake_client(monkeypatch, text_response("LDL is the cholesterol that can build up in arteries."))
+    with TestClient(create_app()) as client:
+        client.post("/assistant/chat", json={"messages": [{"role": "user", "content": "What is LDL?"}]})
+    assert messages.calls[0]["output_config"] == {"effort": "medium"}

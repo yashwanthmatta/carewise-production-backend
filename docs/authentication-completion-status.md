@@ -32,7 +32,7 @@ Last updated: 2026-11-03.
 | Phone one-time codes | NOT STARTED, by rule | — | Needs vendor and cost approval (Twilio Verify or similar) before any code is written to send messages |
 | Account linking | IMPLEMENTED (tests pass) | Same email never merges; link only while signed in; a link URL sent to someone else cannot finish; an identity used by another account cannot be linked | Website screen (next) |
 | Removing a sign-in method | IMPLEMENTED (tests pass) | The last method cannot be removed; the password is required when the account has one | Website screen |
-| Staff accounts | Provider sign-in refused for clinicians and admins | Test | Enforce two-step sign-in for staff (staged); passkeys |
+| Staff accounts | Provider sign-in refused for clinicians and admins. Two-step sign-in requirement built, **off** (`CAREWISE_STAFF_TWO_FACTOR_REQUIRED`) | `test_oidc_sign_in.py`, `test_staff_two_factor.py` | Owner: have staff enroll, then switch it on. Later: passkeys |
 | Session security | Partial | Refresh rotation and revocation exist | Server-side session list, "sign out other devices", shorter access tokens |
 | Website sign-in buttons | NOT STARTED | — | Buttons appear only for providers `/auth/providers` lists, with official branding |
 | iPhone / Android | NOT STARTED | — | System-browser flow to the same API with return `carewise://auth`; no physical-device testing yet |

@@ -78,6 +78,8 @@ class UserSessionOut(BaseModel):
     role: str
     email_verified: bool
     two_factor_enabled: bool = False
+    # True when this is a staff account whose staff access waits on two-step sign-in.
+    staff_two_factor_needed: bool = False
 
 
 class PatientProfileIn(BaseModel):

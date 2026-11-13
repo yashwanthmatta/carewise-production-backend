@@ -207,6 +207,12 @@ def me(user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_
         role=user.role,
         email_verified=account.email_verified == "true" if account else False,
         two_factor_enabled=bool(account.totp_enabled) if account else False,
+        staff_two_factor_needed=bool(
+            account
+            and settings.staff_two_factor_required
+            and not account.totp_enabled
+            and settings.staff_role_for(account.email)
+        ),
     )
 
 

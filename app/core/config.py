@@ -147,6 +147,9 @@ class Settings(BaseSettings):
     # to their care team, and admins have no clinical access. "legacy_global" restores the old
     # rule (every verified clinician and admin can open every profile) for a staged changeover.
     staff_access_mode: str = "grants"
+    # When true, a clinician or admin account works as a patient account until two-step
+    # sign-in is turned on. Off by default: switch on after staff have enrolled.
+    staff_two_factor_required: bool = False
 
     def staff_role_for(self, email: str) -> str | None:
         wanted = (email or "").strip().lower()

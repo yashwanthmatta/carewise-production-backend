@@ -132,3 +132,20 @@ def test_store_subscriptions_end_on_their_expiry_date():
         body = client.get("/subscriptions/entitlements", headers=headers).json()
         # The expired Apple Family plan no longer counts; the live Google Plus plan does.
         assert body["plan_code"] == "plus" and body["source"] == "google"
+
+
+def test_checkout_charges_exactly_the_listed_monthly_price():
+    """Stripe gets the listed price in cents. Prices are whole dollars, so `int(price) * 100` is exact;
+    a price like 6.99 would be charged as 6.00 by that formula, so this test fails if one is added
+    without changing the conversion to cents (Decimal, rounded) first."""
+    from app.api.routes.subscriptions import SUBSCRIPTION_PLANS, checkout_session_data, renewal_notice
+
+    for plan in SUBSCRIPTION_PLANS.values():
+        price = plan["monthly_price_usd"]
+        assert isinstance(price, int) and not isinstance(price, bool), f"{plan['plan_code']}: price must be whole dollars"
+        if not price:
+            continue
+        data = checkout_session_data(plan, "sub_synthetic", "sample.user@example.com")
+        assert data["line_items[0][price_data][unit_amount]"] == str(price * 100)
+        assert data["line_items[0][price_data][currency]"] == "usd"
+        assert f"${price} until you cancel" in renewal_notice(plan)

@@ -39,6 +39,9 @@ jobs:
       - name: Static readiness
         run: python tests/static_readiness_check.py
 
+      - name: No credentials in tracked files
+        run: python scripts/security/secret_scan.py
+
       - name: Compile deploy smoke test
         run: python -m py_compile scripts/smoke_test_deploy.py
 

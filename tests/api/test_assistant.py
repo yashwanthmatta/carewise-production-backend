@@ -57,7 +57,7 @@ def test_helper_answers_with_safety_prompt_and_fallbacks(monkeypatch):
     assert call["model"] == settings.assistant_model
     assert call["fallbacks"] == "default"
     assert call["betas"] == ["server-side-fallback-2026-07-01"]
-    assert "Never name medicines" in call["system"]
+    assert "Never give or suggest a dose" in call["system"]
     assert "Hemoglobin A1c" in call["system"]
     assert "Spanish" in call["system"]
 
@@ -112,13 +112,20 @@ def test_plan_list_does_not_sell_caregiver_sharing():
 
 def test_helper_answers_like_a_clinician_but_keeps_every_safety_rule():
     """The helper explains health questions in depth, clinician style, without ever acting as a
-    doctor: no diagnosis, no medicine names or doses, emergencies first, exact numbers only."""
+    doctor: no diagnosis, no doses or medicine advice, emergencies first, exact numbers only.
+    Since 17 Nov (owner approval) it may say what a named medicine is; every ban on doses, on whether
+    to take it, and on starting, stopping or switching medicines stays."""
     from app.api.routes.assistant import SYSTEM_PROMPT
 
     # Safety rules stay word for word.
     for rule in (
         "You do not diagnose",
-        "Never name medicines, supplements or doses",
+        "Never give or suggest a dose or how often to take it",
+        "never say whether this person should take it",
+        "Never suggest starting, stopping, switching or combining medicines",
+        "Never recommend a medicine or supplement for a result or a symptom",
+        "If you are not sure which medicine a name refers to, say so rather than guess",
+        "point them to the label and their pharmacist or doctor",
         "call 911 or their local emergency number now",
         "Do not claim FollowThrough Health is HIPAA compliant or clinically validated",
         "You cannot see scan images",
@@ -144,3 +151,40 @@ def test_helper_uses_medium_effort(monkeypatch):
     with TestClient(create_app()) as client:
         client.post("/assistant/chat", json={"messages": [{"role": "user", "content": "What is LDL?"}]})
     assert messages.calls[0]["output_config"] == {"effort": "medium"}
+
+
+def test_dosing_advice_is_never_shown():
+    """Owner approved on 17 Nov that the helper may say what a named medicine is ("Dolo 650"). It
+    still must never say how much or how often to take one; a reply that does is replaced."""
+    from app.api.routes.assistant import gives_dosing_advice
+
+    allowed = [
+        "Dolo 650 is a brand of paracetamol (acetaminophen) 650 mg. It is used for fever and mild to moderate pain.",
+        "Lipitor is atorvastatin, a statin that lowers LDL cholesterol.",
+        "Your LDL is 3.6 mmol/L and the lab's range is under 3.0.",
+        "Metformin is a common diabetes medicine. Ask your doctor whether it suits you.",
+        "Dolo 650 es paracetamol de 650 mg, un medicamento para la fiebre y el dolor.",
+    ]
+    withheld = [
+        "Take 650 mg every 6 hours.",
+        "You can take 1 tablet twice a day after food.",
+        "The usual dose of paracetamol is 500 mg.",
+        "Adults should take no more than 4 g a day.",
+        "Give 5 ml three times a day.",
+        "Tome 1 tableta cada 8 horas.",
+        "650 mg every 4 to 6 hours as needed.",
+    ]
+    for text in allowed:
+        assert not gives_dosing_advice(text), text
+    for text in withheld:
+        assert gives_dosing_advice(text), text
+
+
+def test_reply_with_dosing_advice_is_replaced(monkeypatch):
+    fake_client(monkeypatch, text_response("Dolo 650 is paracetamol 650 mg. Take 1 tablet every 6 hours."))
+    with TestClient(create_app()) as client:
+        response = client.post("/assistant/chat", json={"messages": [{"role": "user", "content": "dolo 650"}]})
+    assert response.status_code == 200
+    reply = response.json()["reply"]
+    assert "every 6 hours" not in reply
+    assert "pharmacist" in reply

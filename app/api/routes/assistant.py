@@ -1,4 +1,5 @@
 import logging
+import re
 
 import anthropic
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -34,7 +35,13 @@ are under Account. "Your data" in Account shows what is saved, downloads a copy,
 Rules you always follow:
 - You explain and guide. You do not diagnose, and you never say a result is definitely fine or \
 definitely serious. Point people to their own doctor for decisions.
-- Never name medicines, supplements or doses, and never suggest starting, stopping or changing one.
+- Medicines (rule approved by the owner on 17 Nov 2026): when someone names a medicine or brand, for \
+example "Dolo 650" or "Lipitor", you may say what it is: its generic name, the strength if the name \
+shows it, what kind of medicine it is and what it is commonly used for, in general terms. If you are \
+not sure which medicine a name refers to, say so rather than guess. Never give or suggest a dose or \
+how often to take it, and never say whether this person should take it. Never suggest starting, \
+stopping, switching or combining medicines. Never recommend a medicine or supplement for a result or \
+a symptom. For anything about taking it, point them to the label and their pharmacist or doctor.
 - You cannot see scan images. If asked, explain what the written report words mean.
 - If someone describes chest pain, trouble breathing, signs of a stroke, fainting, severe bleeding, \
 thoughts of self-harm or any emergency, tell them to call 911 or their local emergency number now, \
@@ -63,6 +70,25 @@ critical, or if they feel unwell. Emergencies always come first, as above.
 Style: plain, short sentences, no jargon (explain any medical word you use). Up to about 250 words \
 for health questions and about 100 for questions about using FollowThrough Health. Short lists are \
 fine; no markdown headings."""
+
+# "Take 650 mg twice a day", "1 tablet every 6 hours", "a dose of 500 mg", "max 4 g a day".
+# Naming a strength ("Dolo 650 is paracetamol 650 mg") is allowed and does not match.
+_AMOUNT = r"\d+(?:[.,]\d+)?\s?(?:mg|mcg|µg|g|ml|mL|units?|iu|IU|tablets?|tabs?|pills?|capsules?|drops?|puffs?|tabletas?|comprimidos?|pastillas?|c[aá]psulas?|gotas?)\b"
+_DOSING_PATTERNS = [
+    re.compile(r"\b(?:take|taking|give|giving|use|using|toma|tome|tomar|dar)\b[^.\n]{0,40}?" + _AMOUNT, re.I),
+    re.compile(r"\b(?:dose|dosage|dosis)\s+(?:of|is|de|es)\s+[^.\n]{0,20}?" + _AMOUNT, re.I),
+    re.compile(_AMOUNT + r"[^.\n]{0,25}?\b(?:every|times? a day|per day|a day|daily|twice|cada|veces al d[ií]a|al d[ií]a)\b", re.I),
+    re.compile(r"\b(?:max(?:imum)?|no more than|up to|m[aá]ximo|no m[aá]s de)\b[^.\n]{0,20}?" + _AMOUNT, re.I),
+]
+DOSING_WITHHELD = {
+    "en": "I can't give doses or say how often to take a medicine. Please check the label, and ask your pharmacist or doctor how much is right for you.",
+    "es": "No puedo dar dosis ni decir cada cuánto tomar un medicamento. Revisa la etiqueta y pregunta a tu farmacéutico o médico cuánto es lo adecuado para ti.",
+}
+
+
+def gives_dosing_advice(text: str) -> bool:
+    return any(pattern.search(text) for pattern in _DOSING_PATTERNS)
+
 
 def plans_line() -> str:
     # Built from the same plan list billing uses, so the helper never quotes a stale price.
@@ -129,4 +155,9 @@ def chat(payload: AssistantChatIn, request: Request, db: Session = Depends(get_d
         reply = "".join(block.text for block in response.content if block.type == "text").strip()
     if not reply:
         reply = "Sorry, I don't have an answer for that. Try asking in a different way."
+    if gives_dosing_advice(reply):
+        # A safety net behind the prompt rule: the helper may say what a medicine is, never how much
+        # or how often to take it. A reply that reads like dosing advice is not shown.
+        logger.warning("assistant reply withheld: dosing advice")
+        reply = DOSING_WITHHELD[payload.language]
     return AssistantChatOut(reply=reply, model=response.model)

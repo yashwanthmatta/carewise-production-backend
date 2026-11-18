@@ -1,0 +1,31 @@
+{
+  "version": "2026-11-18.1",
+  "about": "FollowThrough Health medicine reference. An entry is used in answers only when review_status is 'source-verified': every fact in it was checked against the cited source page on the date given. Entries marked 'pending-source-check' carry names only (no facts) and are never shown or sent to the model. Nothing here is clinician-reviewed unless clinical_review says so. No doses: the helper never gives them.",
+  "schema": {
+    "id": "stable id",
+    "kind": "generic | brand",
+    "name": "display name",
+    "aliases": "other spellings and names people type",
+    "market": "country or region for a brand (brands differ by country)",
+    "active_ingredients": "[{name, strength}] - only once verified",
+    "form": "tablet, syrup... - only once verified",
+    "company": "marketer or manufacturer - only once verified",
+    "summary": "one plain sentence: what it is and what it is generally used for - only once verified",
+    "sources": "[{title, url, checked, page_date}] - checked = date the page was read",
+    "sources_to_check": "pages to read before the entry can be verified",
+    "review_status": "pending-source-check | source-verified",
+    "clinical_review": "none | name and date of a qualified reviewer"
+  },
+  "entries": [
+    { "id": "acetaminophen", "kind": "generic", "name": "Acetaminophen (paracetamol)", "aliases": ["acetaminophen", "paracetamol", "apap"], "sources_to_check": ["https://medlineplus.gov/druginfo/meds/a681004.html", "https://rxnav.nlm.nih.gov/"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "dolo-650", "kind": "brand", "name": "Dolo 650", "aliases": ["dolo 650", "dolo650", "dolo-650", "dolo"], "market": "India", "sources_to_check": ["https://www.microlabsltd.com/", "Central Drugs Standard Control Organisation (India) product listing"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "crocin", "kind": "brand", "name": "Crocin", "aliases": ["crocin", "crocin advance", "crocin 650"], "market": "India", "sources_to_check": ["https://www.crocin.com/"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "calpol", "kind": "brand", "name": "Calpol", "aliases": ["calpol"], "market": "United Kingdom, India and others", "sources_to_check": ["https://www.calpol.co.uk/"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "panadol", "kind": "brand", "name": "Panadol", "aliases": ["panadol"], "market": "Several countries", "sources_to_check": ["https://www.panadol.com/"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "tylenol", "kind": "brand", "name": "Tylenol", "aliases": ["tylenol"], "market": "United States, Canada", "sources_to_check": ["https://medlineplus.gov/druginfo/meds/a681004.html", "https://dailymed.nlm.nih.gov/"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "ibuprofen", "kind": "generic", "name": "Ibuprofen", "aliases": ["ibuprofen", "advil", "motrin", "brufen", "nurofen"], "sources_to_check": ["https://medlineplus.gov/druginfo/meds/a682159.html"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "metformin", "kind": "generic", "name": "Metformin", "aliases": ["metformin", "glucophage", "glycomet"], "sources_to_check": ["https://medlineplus.gov/druginfo/meds/a696005.html"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "atorvastatin", "kind": "generic", "name": "Atorvastatin", "aliases": ["atorvastatin", "lipitor", "atorva"], "sources_to_check": ["https://medlineplus.gov/druginfo/meds/a600045.html"], "review_status": "pending-source-check", "clinical_review": "none" },
+    { "id": "levothyroxine", "kind": "generic", "name": "Levothyroxine", "aliases": ["levothyroxine", "synthroid", "eltroxin", "thyronorm", "levoxyl"], "sources_to_check": ["https://medlineplus.gov/druginfo/meds/a682461.html"], "review_status": "pending-source-check", "clinical_review": "none" }
+  ]
+}

@@ -1,5 +1,7 @@
 import logging
 import re
+import time
+from datetime import datetime, timezone
 
 import anthropic
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,6 +11,7 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.api.routes.subscriptions import SUBSCRIPTION_PLANS
 from app.schemas.carewise import AssistantChatIn, AssistantChatOut
+from app.services.medicine_reference import context_for, sources_for
 from app.services.rate_limit import check_rate_limit
 
 # Help chat for the website and app. Nothing the person types is stored: the
@@ -108,8 +111,44 @@ LANGUAGE_NOTE = {
 }
 
 
+# One message for every provider failure: people never see internal details (owner, 18 Nov).
+UNAVAILABLE = "The health assistant is temporarily unavailable. Please try again shortly."
+REQUEST_TIMEOUT_SECONDS = 30.0
+
+
 def get_client() -> anthropic.Anthropic:
-    return anthropic.Anthropic(api_key=settings.clean_env_value(settings.anthropic_api_key), max_retries=2)
+    # Two retries with the SDK's backoff for brief network errors, 429 and 5xx; a hard timeout so a
+    # stuck request never holds the page open.
+    return anthropic.Anthropic(
+        api_key=settings.clean_env_value(settings.anthropic_api_key),
+        max_retries=2,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+
+
+def classify_failure(exc: Exception) -> str:
+    """A short, privacy-safe name for a provider failure: never the question, the answer or the key."""
+    if isinstance(exc, anthropic.AuthenticationError):
+        return "provider_auth_rejected"
+    if isinstance(exc, anthropic.PermissionDeniedError):
+        return "provider_permission_denied"
+    if isinstance(exc, anthropic.NotFoundError):
+        return "provider_model_not_found"
+    if isinstance(exc, anthropic.RateLimitError):
+        return "provider_rate_limited"
+    if isinstance(exc, anthropic.APITimeoutError):
+        return "provider_timeout"
+    if isinstance(exc, anthropic.APIConnectionError):
+        return "provider_unreachable"
+    if isinstance(exc, anthropic.APIStatusError):
+        return f"provider_error_{exc.status_code}"
+    return "provider_error"
+
+
+# GET /assistant/status checks the key and the model without sending any health data, and is
+# cached so it can't be used to run up calls.
+_STATUS_CACHE: dict = {}
+STATUS_TTL_SECONDS = 300
 
 
 def assistant_enabled() -> bool:
@@ -133,6 +172,20 @@ def chat(payload: AssistantChatIn, request: Request, db: Session = Depends(get_d
             + "\n</report_summary>"
         )
 
+    # Medicine names in the question: add the matching entries from the source-checked reference, so
+    # the answer is grounded in a cited record rather than the model's memory alone. Only entries
+    # whose facts were checked against their sources are ever used.
+    question = payload.messages[-1].content
+    reference = context_for(question)
+    if reference:
+        system += (
+            "\n\nReference entries for medicines named in the question, checked against the cited sources. "
+            "Use them for what the medicine is, cite the source by name, and do not add doses:\n<medicine_reference>\n"
+            + reference
+            + "\n</medicine_reference>"
+        )
+
+    started = time.monotonic()
     try:
         response = get_client().beta.messages.create(
             model=settings.assistant_model,
@@ -144,10 +197,17 @@ def chat(payload: AssistantChatIn, request: Request, db: Session = Depends(get_d
             fallbacks="default",
         )
     except anthropic.RateLimitError as exc:
+        logger.warning("assistant request failed: %s", classify_failure(exc))
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="The helper is busy. Try again in a minute.") from exc
+    except anthropic.APITimeoutError as exc:
+        logger.warning("assistant request failed: %s", classify_failure(exc))
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=UNAVAILABLE) from exc
     except (anthropic.APIConnectionError, anthropic.APIStatusError) as exc:
-        logger.warning("assistant request failed: %s", type(exc).__name__)
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="The helper could not answer right now.") from exc
+        # Key rejected, model gone, provider down: one calm message for people, a precise name in the log.
+        logger.warning("assistant request failed: %s", classify_failure(exc))
+        failed_status = status.HTTP_502_BAD_GATEWAY if isinstance(exc, anthropic.InternalServerError) else status.HTTP_503_SERVICE_UNAVAILABLE
+        raise HTTPException(status_code=failed_status, detail=UNAVAILABLE) from exc
+    logger.info("assistant request answered in %d ms", int((time.monotonic() - started) * 1000))
 
     if response.stop_reason == "refusal":
         reply = "I can't help with that one. For questions about your health, please ask your doctor."
@@ -160,4 +220,24 @@ def chat(payload: AssistantChatIn, request: Request, db: Session = Depends(get_d
         # or how often to take it. A reply that reads like dosing advice is not shown.
         logger.warning("assistant reply withheld: dosing advice")
         reply = DOSING_WITHHELD[payload.language]
-    return AssistantChatOut(reply=reply, model=response.model)
+    return AssistantChatOut(reply=reply, model=response.model, sources=sources_for(question))
+
+
+@router.get("/status")
+def assistant_status():
+    """Whether the helper can answer right now: key present, accepted, and the model available."""
+    if not assistant_enabled():
+        return {"state": "not_configured", "model": settings.assistant_model, "checked_at": None}
+    now = time.time()
+    cached = _STATUS_CACHE.get("value")
+    if cached and now - _STATUS_CACHE.get("at", 0) < STATUS_TTL_SECONDS:
+        return cached
+    try:
+        get_client().models.retrieve(settings.assistant_model)
+        state = "ok"
+    except (anthropic.APIConnectionError, anthropic.APIStatusError) as exc:
+        state = classify_failure(exc)
+        logger.warning("assistant status check failed: %s", state)
+    value = {"state": state, "model": settings.assistant_model, "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    _STATUS_CACHE.update(value=value, at=now)
+    return value

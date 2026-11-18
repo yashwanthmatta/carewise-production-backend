@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 from sqlalchemy import text
 
 from app.core.config import settings
+from app.services.lab_testing import LIVE as LAB_TESTING_LIVE
 from app.db.session import SessionLocal
 
 router = APIRouter()
@@ -43,6 +44,7 @@ def features():
         "durable_storage": bool(storage_config["durable"]),
         "storage_ready": bool(storage_config["ready"]),
         "report_uploads": True,
+        "lab_testing_live": LAB_TESTING_LIVE,
         "report_explanations": not settings.report_explanations_paused,
         "text_extraction": True,
         "pdf_text_extraction": True,

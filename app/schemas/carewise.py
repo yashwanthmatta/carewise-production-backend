@@ -357,9 +357,16 @@ class AssistantChatIn(BaseModel):
     source: str = "web"
 
 
+class AssistantSource(BaseModel):
+    title: str
+    url: str
+
+
 class AssistantChatOut(BaseModel):
     reply: str
     model: str
+    # Cited sources for medicine reference entries used in the answer (empty when none were used).
+    sources: list[AssistantSource] = []
 
 
 class DoctorShareIn(BaseModel):

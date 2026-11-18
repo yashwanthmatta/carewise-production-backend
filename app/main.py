@@ -14,6 +14,7 @@ from app.api.routes import (
     consent,
     doctors,
     health,
+    lab_testing,
     inbound,
     insurance,
     lab_trends,
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(health.router)
+    app.include_router(lab_testing.router, prefix="/lab-testing", tags=["lab-testing"])
     app.include_router(mvp.router, tags=["carewise-mvp"])
     app.include_router(auth.router, prefix="/auth", tags=["auth"])
     app.include_router(oidc_routes.router, prefix="/auth", tags=["auth"])

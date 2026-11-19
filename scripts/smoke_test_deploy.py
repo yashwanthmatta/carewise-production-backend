@@ -80,6 +80,31 @@ def check_help_assistant(base_url: str, enabled: bool) -> dict:
         return {"enabled": True, "status": error.code, "answered": False}
 
 
+def check_assistant_status(base_url: str) -> dict:
+    # GET /assistant/status (backend #60) says why the helper can't answer: a rejected key, a missing
+    # model, the provider down. It sends no health data. Older deploys without it return 404.
+    try:
+        return request_json("GET", f"{base_url}/assistant/status")
+    except urllib.error.HTTPError as error:
+        return {"state": f"status_endpoint_http_{error.code}"}
+
+
+def assistant_problem(help_assistant: dict) -> str:
+    """A reason to fail the smoke run, or "" when the helper is fine or switched off on purpose.
+
+    Until 19 Nov the run recorded a helper that could not answer and still passed, so a rejected AI
+    key (E-001) went unnoticed for two days. Now a helper that is switched on but not answering fails
+    the run, which sends the owner GitHub's failed-run email.
+    """
+    if not help_assistant.get("enabled") or help_assistant.get("answered"):
+        return ""
+    state = help_assistant.get("provider_state", "unknown")
+    return (
+        f"Help assistant is switched on but not answering (HTTP {help_assistant.get('status')}, "
+        f"provider state {state}). See docs/chatbot-error-remediation.md."
+    )
+
+
 def check_product_routes(base_url: str) -> dict:
     # Proves the feedback and early-access routes are deployed without writing any data:
     # an unknown event is rejected (422) and the founder summary needs a token (401, or 404 when off).
@@ -129,6 +154,8 @@ def main() -> int:
         ready = request_json("GET", f"{base_url}/ready")
         product_routes = check_product_routes(base_url)
         help_assistant = check_help_assistant(base_url, bool(features.get("help_assistant")))
+        if help_assistant.get("enabled") and not help_assistant.get("answered"):
+            help_assistant["provider_state"] = check_assistant_status(base_url).get("state", "unknown")
         # Public sign-up must never hand out the admin role (refused before any account is created).
         admin_signup_status = status_of("POST", f"{base_url}/auth/signup", {"email": f"smoke-admin-{int(time.time())}@example.com", "password": args.password, "role": "admin"})
         if admin_signup_status != 403:
@@ -314,10 +341,12 @@ def main() -> int:
         print(f"Smoke test failed: {exc}", file=sys.stderr)
         return 1
 
+    problem = assistant_problem(help_assistant)
     print(
         json.dumps(
             {
-                "status": "passed",
+                "status": "failed" if problem else "passed",
+                "problem": problem,
                 "health": health,
                 "ready": ready,
                 "features": {
@@ -367,6 +396,9 @@ def main() -> int:
             indent=2,
         )
     )
+    if problem:
+        print(f"Smoke test failed: {problem}", file=sys.stderr)
+        return 1
     return 0
 
 

@@ -31,6 +31,7 @@ from app.api.routes import (
     subscriptions,
 )
 from app.api.routes import oidc as oidc_routes
+from app.core import log_redaction
 from app.core.config import MIN_SIGNING_SECRET_BYTES, settings
 from app.core.crypto import FieldDecryptionError
 from app.db.init_db import init_local_database
@@ -44,6 +45,7 @@ DEGRADED_MODE_PATHS = {"/health", "/ready", "/features"}
 
 
 def create_app() -> FastAPI:
+    log_redaction.install()
     app = FastAPI(
         title="FollowThrough Health API",
         version="0.1.0",

@@ -11,7 +11,9 @@ import logging
 import re
 
 _PATH_SECRETS = re.compile(r"(/inbound/email/|/reminders/voice/)[^/?#\s]+")
-_QUERY_SECRETS = re.compile(r"([?&](?:code|state|token|id_token|access_token|refresh_token)=)[^&#\s]*", re.IGNORECASE)
+_QUERY_SECRETS = re.compile(
+    r"([?&](?:code|state|token|id_token|access_token|refresh_token)=)[^&#\s]*", re.IGNORECASE
+)
 REDACTED = "[redacted]"
 
 

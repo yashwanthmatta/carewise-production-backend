@@ -354,9 +354,14 @@ def reject_packet(clinic_id: str, packet_id: str, user: CurrentUser = Depends(ge
 @router.get("/{clinic_id}/packets/{packet_id}/source")
 def packet_source(clinic_id: str, packet_id: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     # The text read from an emailed lab PDF, so the clinician's screen can run the lab parser.
-    membership(db, user, clinic_id)
+    _, member = membership(db, user, clinic_id)
     packet = clinic_packet(db, clinic_id, packet_id)
-    return {"text": decrypt_field(packet.encrypted_source_text) if packet.encrypted_source_text else ""}
+    if not packet.encrypted_source_text:
+        return {"text": ""}
+    # Opening the original lab is a view of patient data, so it is recorded like every other packet action.
+    write_audit(db, user.user_id, "", "packet_source_viewed", "lab_packet", packet.id, {"by": member.display_name, "clinic_id": clinic_id})
+    db.commit()
+    return {"text": decrypt_field(packet.encrypted_source_text)}
 
 
 ACTION_LABELS = {
@@ -381,6 +386,7 @@ ACTION_LABELS = {
     "clinic_member_removed": "Team member removed",
     "clinic_member_left": "Left the clinic",
     "visit_summary_viewed": "Visit summary opened",
+    "packet_source_viewed": "Original lab report opened",
     "training_export": "De-identified edit pairs downloaded",
     "patient_questions_reviewed": "Patient questions reviewed",
     "audit_exported": "Audit log downloaded",

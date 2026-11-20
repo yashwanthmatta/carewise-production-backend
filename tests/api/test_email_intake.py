@@ -74,6 +74,10 @@ def test_forwarded_lab_lands_encrypted_in_clinic_inbox_and_drafts_on_screen():
         assert approved["edited"] is False
         trail = [step["action"] for step in client.get(f"/clinics/{clinic['id']}/packets/{packet_id}/audit", headers=headers).json()]
         assert trail[0] == "Received by email" and "Draft created" in trail
+        # Opening the original lab is a view of patient data and is recorded (20 Nov 2026), without lab values.
+        assert trail[1] == "Original lab report opened"
+        steps = client.get(f"/clinics/{clinic['id']}/packets/{packet_id}/audit", headers=headers).json()
+        assert "LDL" not in str(steps) and "118" not in str(steps)
 
     with SessionLocal() as db:
         packet = db.scalars(select(LabPacket)).one()

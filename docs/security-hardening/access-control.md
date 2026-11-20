@@ -54,3 +54,30 @@
 **Migration 0024:** upgrade, downgrade and upgrade pass on SQLite and on PostgreSQL 16 (local, synthetic).
 
 **Website:** the patient-facing "Care team" controls are not built yet. Until then, grants are made through the API. That is the next frontend task, alongside the Your Data page.
+
+## Account access review (20 Nov 2026)
+
+A code review of every route, run on synthetic data. Nothing in production was changed.
+
+- **Every route that returns or changes someone's records requires sign-in.** The routes open without
+  sign-in are: sign-in and sign-up, password reset, the public catalogue and plan lists, health checks,
+  the help chat, anonymous product signals, and links that carry their own secret token (doctor share
+  links, clinic packet links, inbound email, reminder voice calls, the Stripe webhook). The founder
+  summary needs the founder token. Cron routes need the cron token.
+- **Every route that takes a patient, report or sign-in id checks it belongs to the person asking** (or
+  to a patient who granted that clinician access). `tests/api/test_cross_account_sweep.py` now tries all
+  of them, including the older `/upload-report`, `/analyze-report` and `/report-results`, as a second
+  person. Each one is refused and leaks nothing. A missing or forged token gets 401.
+- **New finding:** at startup, production rejected a placeholder sign-in signing key, but not a short one.
+  Sign-in tokens are signed with HS256, and a key shorter than 32 bytes can be guessed offline from a
+  single token. Startup now logs `security: CAREWISE_JWT_SECRET is shorter than 32 bytes` (the name only,
+  never the value or its length). It is a warning, not a refusal to start, because nobody has checked
+  the live key yet.
+
+**Owner check.** After this deploys, search the `carewise-api` logs for `security:`. If the warning
+appears, replace `CAREWISE_JWT_SECRET` in Render with a new random value of at least 48 characters. When
+you do, everyone is signed out once.
+
+**Not covered by this review:** the database network setting and the encryption backfill (see
+`docs/runbooks/database-network-restriction.md` and `encryption-migration.md`), and penetration testing
+by an independent tester.

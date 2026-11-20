@@ -31,7 +31,7 @@ from app.api.routes import (
     subscriptions,
 )
 from app.api.routes import oidc as oidc_routes
-from app.core.config import settings
+from app.core.config import MIN_SIGNING_SECRET_BYTES, settings
 from app.core.crypto import FieldDecryptionError
 from app.db.init_db import init_local_database
 from app.services.telemetry import configure_telemetry
@@ -124,6 +124,8 @@ def create_app() -> FastAPI:
             app.state.startup_error = str(error)
             logger.error("Starting in degraded mode: %s", error)
             return
+        for name in settings.weak_secret_warnings():
+            logger.warning("security: %s is shorter than %s bytes; replace it with a longer random value", name, MIN_SIGNING_SECRET_BYTES)
         init_local_database()
 
     return app

@@ -6,6 +6,9 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+# HS256 sign-in tokens: a key shorter than the hash output (32 bytes) can be guessed offline from one token.
+MIN_SIGNING_SECRET_BYTES = 32
+
 PLACEHOLDER_VALUES = {
     "",
     "replace-me",
@@ -320,6 +323,15 @@ class Settings(BaseSettings):
                 "Production configuration is not ready. Set real values for: "
                 + ", ".join(sorted(set(missing)))
             )
+
+    def weak_secret_warnings(self) -> list[str]:
+        """Names of secrets that are set but shorter than a safe length. Only names are returned, never a
+        value or its length. A warning, not a startup failure: refusing to start on a key nobody has checked
+        yet would take the live site down."""
+        warnings = []
+        if self.is_production and len(self.clean_jwt_secret.encode("utf-8")) < MIN_SIGNING_SECRET_BYTES:
+            warnings.append("CAREWISE_JWT_SECRET")
+        return warnings
 
 
 @lru_cache

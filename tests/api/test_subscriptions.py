@@ -185,3 +185,16 @@ def test_paid_plan_can_open_billing_portal(monkeypatch):
         assert portal.status_code == 200
         assert portal.json()["portal_url"].startswith("https://billing.stripe.com/")
         assert opened == ["cus_test_family"]
+
+
+def test_plan_copy_makes_no_banned_claims():
+    """The website's claims audit bans "explain any report" and "lifetime health record"; the plans
+    the API serves are shown in the app too, so they follow the same rule (22 Nov 2026)."""
+    import re
+
+    from app.api.routes.subscriptions import SUBSCRIPTION_PLANS
+
+    banned = re.compile(r"explain any (lab|report|scan)|lifetime health record|HIPAA[- ]compliant|100% accura", re.IGNORECASE)
+    for plan in SUBSCRIPTION_PLANS.values():
+        text = " ".join([plan["summary"], *plan["features"]])
+        assert not banned.search(text), (plan["plan_code"], text)

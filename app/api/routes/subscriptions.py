@@ -37,8 +37,10 @@ SUBSCRIPTION_PLANS = {
         "name": "Free",
         "monthly_price_usd": 0,
         "stripe_lookup_key": "",
-        "summary": "Explain any report, take a doctor brief, keep a health record.",
-        "features": ["Explain any lab or scan report", "One-page doctor brief", "Lifetime health record"],
+        # Same words as the website's pricing table. "Any report" and "lifetime" were overclaims: the
+        # reader supports a set list of tests, and nothing is kept forever (22 Nov 2026).
+        "summary": "Explain common lab and scan reports, take a doctor brief, keep a health record on your device.",
+        "features": ["Explain common lab and scan reports", "One-page doctor brief", "Health record saved on your device"],
     },
     "plus": {
         "plan_code": "plus",

@@ -311,6 +311,32 @@ USAGE_EVENTS = (
     "spanish_used",
     "early_access_opened",
     "listen_used",
+    # Sent by the website since the share packet was built, but never on this list, so every one
+    # was refused (found 22 Nov 2026).
+    "share_packet_pdf",
+    # Core-workflow funnel (22 Nov 2026). Daily counts only, like every event here: no account, no
+    # report content, no IP, no device id. They measure whether people complete the core workflow.
+    "home_viewed",
+    "upload_started",
+    "value_corrected",
+    "source_line_viewed",
+    "report_saved",
+    "questions_copied",
+    "reminder_created",
+    "returning_visit",
+    "plan_interest",
+)
+
+# The core workflow in order, for the founder summary's funnel. Each step is a daily count; the
+# ratios between steps are a rough guide, not per-person conversion (nobody is tracked).
+FUNNEL_STEPS = (
+    "home_viewed",
+    "upload_started",
+    "report_explained",
+    "source_line_viewed",
+    "doctor_brief_opened",
+    "report_saved",
+    "reminder_created",
 )
 SIGNAL_SOURCES = ("web", "mobile")
 EARLY_ACCESS_ROLES = ("caregiver", "patient", "clinician", "other")

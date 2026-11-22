@@ -163,6 +163,7 @@ def test_core_workflow_funnel_is_counted_and_summarised(monkeypatch):
             for _ in range(times):
                 assert client.post("/product/events", json={"name": name}).status_code == 200
         for name in (
+            "share_packet_pdf",
             "value_corrected",
             "report_saved",
             "questions_copied",

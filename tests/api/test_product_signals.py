@@ -194,6 +194,6 @@ def test_core_workflow_funnel_is_counted_and_summarised(monkeypatch):
         and funnel[1]["of_previous"] == 0.6
         and funnel[2]["of_previous"] == round(5 / 6, 3)
     )
-    with SessionLocal() as db:
-        columns = set(UsageCounter.__table__.columns.keys())
+    # The counter table holds no column that could identify a person.
+    columns = set(UsageCounter.__table__.columns.keys())
     assert columns <= {"id", "day", "name", "source", "count", "created_at", "updated_at"}

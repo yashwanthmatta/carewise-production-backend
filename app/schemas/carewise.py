@@ -311,6 +311,9 @@ USAGE_EVENTS = (
     "spanish_used",
     "early_access_opened",
     "listen_used",
+    # Sent by the website since the share packet was built, but never on this list, so every one
+    # was refused (found 22 Nov 2026).
+    "share_packet_pdf",
     # Core-workflow funnel (22 Nov 2026). Daily counts only, like every event here: no account, no
     # report content, no IP, no device id. They measure whether people complete the core workflow.
     "home_viewed",

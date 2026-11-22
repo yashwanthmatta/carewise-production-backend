@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.services.founder_metrics import people_metrics
 from app.core.crypto import decrypt_field, encrypt_field
 from app.db.session import get_db
 from app.models.carewise import EarlyAccessSignup, ProductFeedback, UsageCounter
@@ -163,7 +164,15 @@ def founder_summary(
             }
         )
         previous = count
+    try:
+        from app.api.routes.assistant import assistant_status
+
+        ai = assistant_status()
+    except Exception:  # the summary must still load if the provider check itself breaks
+        ai = {"state": "unknown"}
     return {
+        **people_metrics(db),
+        "ai": ai,
         "usage_totals": totals,
         "funnel": funnel,
         "usage_by_day": [

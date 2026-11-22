@@ -10,20 +10,34 @@ from app.models.carewise import EarlyAccessSignup, ProductFeedback, UsageCounter
 def test_usage_events_are_daily_counts_only():
     with TestClient(create_app()) as client:
         for _ in range(3):
-            assert client.post("/product/events", json={"name": "report_explained"}).status_code == 200
-        assert client.post("/product/events", json={"name": "demo_started", "source": "mobile"}).status_code == 200
+            assert (
+                client.post("/product/events", json={"name": "report_explained"}).status_code == 200
+            )
+        assert (
+            client.post(
+                "/product/events", json={"name": "demo_started", "source": "mobile"}
+            ).status_code
+            == 200
+        )
         assert client.post("/product/events", json={"name": "listen_used"}).status_code == 200
         assert client.post("/product/events", json={"name": "anything_else"}).status_code == 422
 
     with SessionLocal() as db:
         rows = db.scalars(select(UsageCounter)).all()
         counts = {(row.name, row.source): row.count for row in rows}
-        assert counts == {("report_explained", "web"): 3, ("demo_started", "mobile"): 1, ("listen_used", "web"): 1}
+        assert counts == {
+            ("report_explained", "web"): 3,
+            ("demo_started", "mobile"): 1,
+            ("listen_used", "web"): 1,
+        }
 
 
 def test_feedback_comment_is_encrypted():
     with TestClient(create_app()) as client:
-        response = client.post("/product/feedback", json={"helpful": False, "comment": "Too many words on the result page"})
+        response = client.post(
+            "/product/feedback",
+            json={"helpful": False, "comment": "Too many words on the result page"},
+        )
         assert response.status_code == 200
         assert client.post("/product/feedback", json={"helpful": True}).status_code == 200
 
@@ -37,9 +51,23 @@ def test_feedback_comment_can_follow_once():
     with TestClient(create_app()) as client:
         answer = client.post("/product/feedback", json={"helpful": True})
         feedback_id = answer.json()["id"]
-        assert client.post(f"/product/feedback/{feedback_id}/comment", json={"comment": "Loved the doctor brief"}).status_code == 200
-        assert client.post(f"/product/feedback/{feedback_id}/comment", json={"comment": "Overwrite"}).status_code == 404
-        assert client.post("/product/feedback/fb_missing/comment", json={"comment": "x"}).status_code == 404
+        assert (
+            client.post(
+                f"/product/feedback/{feedback_id}/comment",
+                json={"comment": "Loved the doctor brief"},
+            ).status_code
+            == 200
+        )
+        assert (
+            client.post(
+                f"/product/feedback/{feedback_id}/comment", json={"comment": "Overwrite"}
+            ).status_code
+            == 404
+        )
+        assert (
+            client.post("/product/feedback/fb_missing/comment", json={"comment": "x"}).status_code
+            == 404
+        )
 
     with SessionLocal() as db:
         rows = db.scalars(select(ProductFeedback)).all()
@@ -48,12 +76,25 @@ def test_feedback_comment_can_follow_once():
 
 def test_early_access_needs_consent_and_dedupes():
     with TestClient(create_app()) as client:
-        no_consent = client.post("/product/early-access", json={"email": "a@example.com", "consent": False})
+        no_consent = client.post(
+            "/product/early-access", json={"email": "a@example.com", "consent": False}
+        )
         assert no_consent.status_code == 422
-        first = client.post("/product/early-access", json={"email": "A@Example.com", "role": "caregiver", "consent": True})
-        again = client.post("/product/early-access", json={"email": "a@example.com", "role": "patient", "consent": True})
+        first = client.post(
+            "/product/early-access",
+            json={"email": "A@Example.com", "role": "caregiver", "consent": True},
+        )
+        again = client.post(
+            "/product/early-access",
+            json={"email": "a@example.com", "role": "patient", "consent": True},
+        )
         assert first.status_code == 200 and again.status_code == 200
-        assert client.post("/product/early-access", json={"email": "not-an-email", "consent": True}).status_code == 422
+        assert (
+            client.post(
+                "/product/early-access", json={"email": "not-an-email", "consent": True}
+            ).status_code
+            == 422
+        )
 
     with SessionLocal() as db:
         rows = db.scalars(select(EarlyAccessSignup)).all()
@@ -70,11 +111,23 @@ def test_founder_summary_is_off_without_token_and_protected_with_one(monkeypatch
         monkeypatch.setattr(settings, "founder_token", "founder-secret-value")
         client.post("/product/events", json={"name": "report_explained"})
         client.post("/product/feedback", json={"helpful": True, "comment": "Clear"})
-        client.post("/product/early-access", json={"email": "c@example.com", "role": "caregiver", "note": "Mum's thyroid", "consent": True})
+        client.post(
+            "/product/early-access",
+            json={
+                "email": "c@example.com",
+                "role": "caregiver",
+                "note": "Mum's thyroid",
+                "consent": True,
+            },
+        )
 
         assert client.get("/product/summary").status_code == 401
-        assert client.get("/product/summary", headers={"X-Founder-Token": "wrong"}).status_code == 401
-        summary = client.get("/product/summary", headers={"X-Founder-Token": "founder-secret-value"})
+        assert (
+            client.get("/product/summary", headers={"X-Founder-Token": "wrong"}).status_code == 401
+        )
+        summary = client.get(
+            "/product/summary", headers={"X-Founder-Token": "founder-secret-value"}
+        )
         assert summary.status_code == 200
         body = summary.json()
         assert body["usage_totals"] == {"report_explained": 1}
@@ -86,6 +139,61 @@ def test_founder_summary_is_off_without_token_and_protected_with_one(monkeypatch
 
 def test_event_rate_limit_is_generous_but_bounded():
     with TestClient(create_app()) as client:
-        codes = [client.post("/product/events", json={"name": "sample_opened"}).status_code for _ in range(122)]
+        codes = [
+            client.post("/product/events", json={"name": "sample_opened"}).status_code
+            for _ in range(122)
+        ]
         assert codes[:120] == [200] * 120
         assert codes[-1] == 429
+
+
+def test_core_workflow_funnel_is_counted_and_summarised(monkeypatch):
+    """22 Nov 2026: funnel steps are accepted as plain daily counts and the founder summary lists
+    them in workflow order with the share of the previous step. Nothing identifies a person."""
+    monkeypatch.setattr(settings, "founder_token", "founder-secret-value")
+    plan = {
+        "home_viewed": 10,
+        "upload_started": 6,
+        "report_explained": 5,
+        "source_line_viewed": 2,
+        "doctor_brief_opened": 1,
+    }
+    with TestClient(create_app()) as client:
+        for name, times in plan.items():
+            for _ in range(times):
+                assert client.post("/product/events", json={"name": name}).status_code == 200
+        for name in (
+            "value_corrected",
+            "report_saved",
+            "questions_copied",
+            "reminder_created",
+            "returning_visit",
+            "plan_interest",
+        ):
+            assert client.post("/product/events", json={"name": name}).status_code == 200
+        # Unknown names, or anything that looks like content, are refused.
+        assert client.post("/product/events", json={"name": "LDL 162 mg/dL"}).status_code == 422
+        body = client.get(
+            "/product/summary", headers={"X-Founder-Token": "founder-secret-value"}
+        ).json()
+
+    funnel = body["funnel"]
+    assert [row["step"] for row in funnel] == [
+        "home_viewed",
+        "upload_started",
+        "report_explained",
+        "source_line_viewed",
+        "doctor_brief_opened",
+        "report_saved",
+        "reminder_created",
+    ]
+    counts = {row["step"]: row["count"] for row in funnel}
+    assert counts == {**plan, "report_saved": 1, "reminder_created": 1}
+    assert (
+        funnel[0]["of_previous"] is None
+        and funnel[1]["of_previous"] == 0.6
+        and funnel[2]["of_previous"] == round(5 / 6, 3)
+    )
+    with SessionLocal() as db:
+        columns = set(UsageCounter.__table__.columns.keys())
+    assert columns <= {"id", "day", "name", "source", "count", "created_at", "updated_at"}

@@ -12,6 +12,7 @@ from app.db.session import get_db
 from app.models.carewise import EarlyAccessSignup, ProductFeedback, UsageCounter
 from app.schemas.carewise import (
     EARLY_ACCESS_ROLES,
+    FUNNEL_STEPS,
     SIGNAL_SOURCES,
     USAGE_EVENTS,
     EarlyAccessIn,
@@ -40,7 +41,11 @@ def record_event(payload: UsageEventIn, request: Request, db: Session = Depends(
     day = datetime.now(timezone.utc).date().isoformat()
     source = clean_source(payload.source)
     counter = db.scalar(
-        select(UsageCounter).where(UsageCounter.day == day, UsageCounter.name == payload.name, UsageCounter.source == source)
+        select(UsageCounter).where(
+            UsageCounter.day == day,
+            UsageCounter.name == payload.name,
+            UsageCounter.source == source,
+        )
     )
     if counter is None:
         db.add(UsageCounter(day=day, name=payload.name, source=source, count=1))
@@ -65,7 +70,9 @@ def record_feedback(payload: FeedbackIn, request: Request, db: Session = Depends
 
 # The answer is saved on the first tap; an optional comment can follow once.
 @router.post("/feedback/{feedback_id}/comment", response_model=SignalAccepted)
-def add_feedback_comment(feedback_id: str, payload: FeedbackCommentIn, request: Request, db: Session = Depends(get_db)):
+def add_feedback_comment(
+    feedback_id: str, payload: FeedbackCommentIn, request: Request, db: Session = Depends(get_db)
+):
     check_rate_limit(db, request, "product_feedback", max_attempts=20)
     feedback = db.get(ProductFeedback, feedback_id)
     if feedback is None or feedback.encrypted_comment:
@@ -78,12 +85,16 @@ def add_feedback_comment(feedback_id: str, payload: FeedbackCommentIn, request: 
 @router.post("/early-access", response_model=SignalAccepted)
 def join_early_access(payload: EarlyAccessIn, request: Request, db: Session = Depends(get_db)):
     if not payload.consent:
-        raise HTTPException(status_code=422, detail="Please agree to be contacted about early access.")
+        raise HTTPException(
+            status_code=422, detail="Please agree to be contacted about early access."
+        )
     check_rate_limit(db, request, "early_access", max_attempts=5)
     email = str(payload.email).strip().lower()
     email_hash = hashlib.sha256(email.encode("utf-8")).hexdigest()
     role = payload.role if payload.role in EARLY_ACCESS_ROLES else "other"
-    existing = db.scalar(select(EarlyAccessSignup).where(EarlyAccessSignup.email_hash == email_hash))
+    existing = db.scalar(
+        select(EarlyAccessSignup).where(EarlyAccessSignup.email_hash == email_hash)
+    )
     if existing is None:
         db.add(
             EarlyAccessSignup(
@@ -114,25 +125,59 @@ def founder_summary(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found.")
     check_rate_limit(db, request, "founder_summary", max_attempts=30)
     if not hmac.compare_digest(x_founder_token.encode("utf-8"), configured.encode("utf-8")):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Founder token required.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Founder token required."
+        )
 
     counters = db.execute(
-        select(UsageCounter.day, UsageCounter.name, UsageCounter.source, UsageCounter.count).order_by(UsageCounter.day.desc())
+        select(
+            UsageCounter.day, UsageCounter.name, UsageCounter.source, UsageCounter.count
+        ).order_by(UsageCounter.day.desc())
     ).all()
     totals: dict[str, int] = {}
     for _, name, _, count in counters:
         totals[name] = totals.get(name, 0) + (count or 0)
-    helpful = dict(db.execute(select(ProductFeedback.helpful, func.count()).group_by(ProductFeedback.helpful)).all())
+    helpful = dict(
+        db.execute(
+            select(ProductFeedback.helpful, func.count()).group_by(ProductFeedback.helpful)
+        ).all()
+    )
     comments = db.scalars(
-        select(ProductFeedback).where(ProductFeedback.encrypted_comment != "").order_by(ProductFeedback.created_at.desc()).limit(100)
+        select(ProductFeedback)
+        .where(ProductFeedback.encrypted_comment != "")
+        .order_by(ProductFeedback.created_at.desc())
+        .limit(100)
     ).all()
-    signups = db.scalars(select(EarlyAccessSignup).order_by(EarlyAccessSignup.created_at.desc())).all()
+    signups = db.scalars(
+        select(EarlyAccessSignup).order_by(EarlyAccessSignup.created_at.desc())
+    ).all()
+    funnel = []
+    previous = None
+    for step in FUNNEL_STEPS:
+        count = totals.get(step, 0)
+        funnel.append(
+            {
+                "step": step,
+                "count": count,
+                "of_previous": round(count / previous, 3) if previous else None,
+            }
+        )
+        previous = count
     return {
         "usage_totals": totals,
-        "usage_by_day": [{"day": day, "name": name, "source": source, "count": count} for day, name, source, count in counters[:400]],
+        "funnel": funnel,
+        "usage_by_day": [
+            {"day": day, "name": name, "source": source, "count": count}
+            for day, name, source, count in counters[:400]
+        ],
         "helpful": {"yes": helpful.get("yes", 0), "no": helpful.get("no", 0)},
         "comments": [
-            {"helpful": item.helpful, "comment": decrypt_field(item.encrypted_comment), "source": item.source, "created_at": item.created_at}
+            {
+                "helpful": item.helpful,
+                "comment": decrypt_field(item.encrypted_comment),
+                "source": item.source,
+                "created_at": item.created_at,
+            }
             for item in comments
         ],
         "early_access": [

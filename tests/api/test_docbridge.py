@@ -14,13 +14,13 @@ def make_clinic(client):
     return headers, clinic.json()["id"]
 
 
-def draft(client, headers, clinic_id, value="148", lab_date="2026-10-01", ref="JD-1042"):
+def draft(client, headers, clinic_id, value="148", lab_date="2026-10-01", ref="JD-1042", unit="mg/dL"):
     response = client.post(
         f"/clinics/{clinic_id}/packets",
         json={
             "patient_ref": ref,
             "lab_date": lab_date,
-            "markers": [{"name": "LDL cholesterol", "value": value, "unit": "mg/dL", "range": "<100", "status": "High"}],
+            "markers": [{"name": "LDL cholesterol", "value": value, "unit": unit, "range": "<100", "status": "High"}],
             "summary": "Your LDL cholesterol is above the usual target.",
             "questions": ["What LDL goal fits me?"],
             "deidentified_confirmed": True,
@@ -90,9 +90,23 @@ def test_visit_summary_shows_what_changed():
         draft(client, headers, clinic_id, value="148", lab_date="2026-10-01")
         summary = client.get(f"/clinics/{clinic_id}/patients/jd-1042/summary", headers=headers).json()
         assert len(summary["packets"]) == 2
-        assert summary["changes"] == [{"name": "LDL cholesterol", "before": "162", "now": "148", "unit": "mg/dL", "status": "High"}]
+        assert summary["changes"] == [
+            {"name": "LDL cholesterol", "before": "162", "before_unit": "mg/dL", "now": "148", "unit": "mg/dL", "status": "High"}
+        ]
         follow = client.post(f"/clinics/{clinic_id}/packets/{summary['packets'][0]['id']}/follow-up", headers=headers)
         assert follow.json()["status"] == "needs_call"
+
+
+def test_visit_summary_keeps_each_reports_unit():
+    # Synthetic values: the second lab printed LDL in mmol/L. The earlier value keeps mg/dL and is not converted.
+    with TestClient(create_app()) as client:
+        headers, clinic_id = make_clinic(client)
+        draft(client, headers, clinic_id, value="162", lab_date="2026-06-01")
+        draft(client, headers, clinic_id, value="3.8", lab_date="2026-10-01", unit="mmol/L")
+        summary = client.get(f"/clinics/{clinic_id}/patients/jd-1042/summary", headers=headers).json()
+        assert summary["changes"] == [
+            {"name": "LDL cholesterol", "before": "162", "before_unit": "mg/dL", "now": "3.8", "unit": "mmol/L", "status": "High"}
+        ]
 
 
 def test_deleting_account_removes_owned_clinic():

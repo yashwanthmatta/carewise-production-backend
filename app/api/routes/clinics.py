@@ -631,7 +631,9 @@ def visit_summary(clinic_id: str, patient_ref: str, user: CurrentUser = Depends(
         for marker in history[-1]["markers"]:
             old = before.get(marker["name"])
             if old and old.get("value") != marker.get("value"):
-                changes.append({"name": marker["name"], "before": old.get("value"), "now": marker.get("value"), "unit": marker.get("unit", ""), "status": marker.get("status", "")})
+                # The earlier value keeps its own unit, so "126 mg/dL" then "7.2 mmol/L" is never shown
+                # as "126 -> 7.2 mmol/L". Nothing is converted.
+                changes.append({"name": marker["name"], "before": old.get("value"), "before_unit": old.get("unit", ""), "now": marker.get("value"), "unit": marker.get("unit", ""), "status": marker.get("status", "")})
     write_audit(db, user.user_id, "", "visit_summary_viewed", "clinic", clinic_id, {"packets": len(history)})
     db.commit()
     return {"patient_ref": patient_ref, "packets": history, "changes": changes, "settings": visit_settings_out(clinic)}

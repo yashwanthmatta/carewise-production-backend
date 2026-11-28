@@ -91,7 +91,7 @@ def test_visit_summary_shows_what_changed():
         summary = client.get(f"/clinics/{clinic_id}/patients/jd-1042/summary", headers=headers).json()
         assert len(summary["packets"]) == 2
         assert summary["changes"] == [
-            {"name": "LDL cholesterol", "before": "162", "before_unit": "mg/dL", "now": "148", "unit": "mg/dL", "status": "High"}
+            {"name": "LDL cholesterol", "before": "162", "before_unit": "mg/dL", "now": "148", "unit": "mg/dL", "status": "High", "units_differ": False}
         ]
         follow = client.post(f"/clinics/{clinic_id}/packets/{summary['packets'][0]['id']}/follow-up", headers=headers)
         assert follow.json()["status"] == "needs_call"
@@ -105,8 +105,23 @@ def test_visit_summary_keeps_each_reports_unit():
         draft(client, headers, clinic_id, value="3.8", lab_date="2026-10-01", unit="mmol/L")
         summary = client.get(f"/clinics/{clinic_id}/patients/jd-1042/summary", headers=headers).json()
         assert summary["changes"] == [
-            {"name": "LDL cholesterol", "before": "162", "before_unit": "mg/dL", "now": "3.8", "unit": "mmol/L", "status": "High"}
+            {"name": "LDL cholesterol", "before": "162", "before_unit": "mg/dL", "now": "3.8", "unit": "mmol/L", "status": "High", "units_differ": True}
         ]
+
+
+def test_visit_summary_marks_different_units_even_when_the_numbers_match():
+    # Synthetic: the same printed number in two units is not "no change", and case alone is not a new unit.
+    with TestClient(create_app()) as client:
+        headers, clinic_id = make_clinic(client)
+        draft(client, headers, clinic_id, value="5.5", lab_date="2026-06-01")
+        draft(client, headers, clinic_id, value="5.5", lab_date="2026-10-01", unit="mmol/L")
+        changes = client.get(f"/clinics/{clinic_id}/patients/jd-1042/summary", headers=headers).json()["changes"]
+        assert [(c["before"], c["now"], c["units_differ"]) for c in changes] == [("5.5", "5.5", True)]
+
+        headers, clinic_id = make_clinic(client)
+        draft(client, headers, clinic_id, value="162", lab_date="2026-06-01")
+        draft(client, headers, clinic_id, value="162", lab_date="2026-10-01", unit="MG/DL")
+        assert client.get(f"/clinics/{clinic_id}/patients/jd-1042/summary", headers=headers).json()["changes"] == []
 
 
 def test_deleting_account_removes_owned_clinic():

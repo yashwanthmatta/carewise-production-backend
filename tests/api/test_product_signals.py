@@ -170,6 +170,8 @@ def test_core_workflow_funnel_is_counted_and_summarised(monkeypatch):
             "reminder_created",
             "returning_visit",
             "plan_interest",
+            "value_confirmed",
+            "value_mismatch",
         ):
             assert client.post("/product/events", json={"name": name}).status_code == 200
         # Unknown names, or anything that looks like content, are refused.

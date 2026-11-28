@@ -617,6 +617,10 @@ def update_visit_settings(
     return visit_settings_out(clinic)
 
 
+def unit_key(unit: str | None) -> str:
+    return "".join(str(unit or "").lower().split())
+
+
 @router.get("/{clinic_id}/patients/{patient_ref}/summary")
 def visit_summary(clinic_id: str, patient_ref: str, user: CurrentUser = Depends(get_current_user), db: Session = Depends(get_db)):
     clinic, _ = membership(db, user, clinic_id)
@@ -630,8 +634,22 @@ def visit_summary(clinic_id: str, patient_ref: str, user: CurrentUser = Depends(
         before = {m["name"]: m for m in history[-2]["markers"]}
         for marker in history[-1]["markers"]:
             old = before.get(marker["name"])
-            if old and old.get("value") != marker.get("value"):
-                changes.append({"name": marker["name"], "before": old.get("value"), "now": marker.get("value"), "unit": marker.get("unit", ""), "status": marker.get("status", "")})
+            if not old:
+                continue
+            # Units are compared as printed, ignoring case and spaces. When they differ the row is kept
+            # but marked, so "162 mg/dL" then "4.2 mmol/L" is never counted as a change, and "5.5 mg/dL"
+            # then "5.5 mmol/L" is not hidden as "no change". Nothing is converted.
+            units_differ = unit_key(old.get("unit")) != unit_key(marker.get("unit"))
+            if units_differ or old.get("value") != marker.get("value"):
+                changes.append({
+                    "name": marker["name"],
+                    "before": old.get("value"),
+                    "before_unit": old.get("unit", ""),
+                    "now": marker.get("value"),
+                    "unit": marker.get("unit", ""),
+                    "status": marker.get("status", ""),
+                    "units_differ": units_differ,
+                })
     write_audit(db, user.user_id, "", "visit_summary_viewed", "clinic", clinic_id, {"packets": len(history)})
     db.commit()
     return {"patient_ref": patient_ref, "packets": history, "changes": changes, "settings": visit_settings_out(clinic)}

@@ -325,6 +325,9 @@ USAGE_EVENTS = (
     "reminder_created",
     "returning_visit",
     "plan_interest",
+    # "Does this match your report?" on each result card (24 Nov 2026): the measured misread rate.
+    "value_confirmed",
+    "value_mismatch",
 )
 
 # The core workflow in order, for the founder summary's funnel. Each step is a daily count; the
